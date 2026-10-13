@@ -7,7 +7,6 @@
 
 package com.facebook.react.fabric.mounting
 
-import android.os.SystemClock
 import android.view.View
 import androidx.annotation.UiThread
 import com.facebook.common.logging.FLog
@@ -17,6 +16,7 @@ import com.facebook.react.bridge.ReactIgnorableMountingException
 import com.facebook.react.bridge.ReactNoCrashSoftException
 import com.facebook.react.bridge.ReactSoftExceptionLogger
 import com.facebook.react.bridge.RetryableMountingLayerException
+import com.facebook.react.common.SystemClock
 import com.facebook.react.fabric.FabricUIManager
 import com.facebook.react.fabric.mounting.mountitems.DispatchCommandMountItem
 import com.facebook.react.fabric.mounting.mountitems.MountItem
@@ -54,6 +54,10 @@ internal class MountItemDispatcher(
     private set
 
   private var lastFrameTimeNanos: Long = 0L
+
+  // The display's frame at its fastest refresh rate: frame timestamps step by the vsync period, and
+  // by a multiple of it across a skipped frame.
+  private var shortestFrameIntervalNanos: Long = FRAME_TIME_NS
 
   fun addViewCommandMountItem(mountItem: DispatchCommandMountItem) {
     if (!ReactNativeFeatureFlags.disableEarlyViewCommandExecution()) {
@@ -329,6 +333,14 @@ internal class MountItemDispatcher(
   @UiThread
   @ThreadConfined(UI)
   fun dispatchPreMountItems(frameTimeNanos: Long) {
+    val frameIntervalNanos = frameTimeNanos - lastFrameTimeNanos
+    if (
+        lastFrameTimeNanos != 0L &&
+            frameIntervalNanos > 0L &&
+            frameIntervalNanos < shortestFrameIntervalNanos
+    ) {
+      shortestFrameIntervalNanos = frameIntervalNanos
+    }
     lastFrameTimeNanos = frameTimeNanos
 
     if (preMountItems.isEmpty()) {
@@ -336,7 +348,7 @@ internal class MountItemDispatcher(
       return
     }
 
-    val deadline = lastFrameTimeNanos + FRAME_TIME_NS / 2
+    val deadline = lastFrameTimeNanos + shortestFrameIntervalNanos / 2
     dispatchPreMountItemsImpl(deadline)
   }
 
@@ -355,7 +367,7 @@ internal class MountItemDispatcher(
 
           try {
             while (true) {
-              if (System.nanoTime() > deadline) {
+              if (SystemClock.nanoTime() > deadline) {
                 break
               }
 
