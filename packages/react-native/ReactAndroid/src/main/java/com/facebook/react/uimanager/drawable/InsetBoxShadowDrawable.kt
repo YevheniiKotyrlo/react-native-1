@@ -37,28 +37,79 @@ private const val BLUR_RADIUS_SIGMA_SCALE = 0.5f
 
 private val ZERO_RADII = floatArrayOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f)
 
+private fun createBlurMaskFilter(blurRadius: Float): BlurMaskFilter? {
+  val convertedBlurRadius = FilterHelper.sigmaToRadius(blurRadius * BLUR_RADIUS_SIGMA_SCALE)
+  return if (convertedBlurRadius > 0) {
+    BlurMaskFilter(convertedBlurRadius, BlurMaskFilter.Blur.NORMAL)
+  } else {
+    null
+  }
+}
+
 /** Draws an inner box-shadow https://www.w3.org/TR/css-backgrounds-3/#shadow-shape */
 @RequiresApi(MIN_INSET_BOX_SHADOW_SDK_VERSION)
 internal class InsetBoxShadowDrawable(
     private val context: Context,
-    private val shadowColor: Int,
-    private val offsetX: Float,
-    private val offsetY: Float,
-    private val blurRadius: Float,
-    private val spread: Float,
+    shadowColor: Int,
+    offsetX: Float,
+    offsetY: Float,
+    blurRadius: Float,
+    spread: Float,
     borderInsets: BorderInsets? = null,
     borderRadius: BorderRadiusStyle? = null,
 ) : Drawable() {
-  private val shadowPaint =
-      Paint().apply {
-        color = shadowColor
-        val convertedBlurRadius = FilterHelper.sigmaToRadius(blurRadius * BLUR_RADIUS_SIGMA_SCALE)
-        if (convertedBlurRadius > 0) {
-          maskFilter = BlurMaskFilter(convertedBlurRadius, BlurMaskFilter.Blur.NORMAL)
-        }
-      }
+  private val shadowPaint = Paint().apply { maskFilter = createBlurMaskFilter(blurRadius) }
 
-  private val isBlurred = shadowPaint.maskFilter != null
+  private var drawableAlpha = 255
+
+  private val isBlurred: Boolean
+    get() = shadowPaint.maskFilter != null
+
+  var shadowColor: Int = shadowColor
+    set(value) {
+      if (value != field) {
+        field = value
+        applyShadowColor()
+        invalidateSelf()
+      }
+    }
+
+  init {
+    applyShadowColor()
+  }
+
+  var offsetX: Float = offsetX
+    set(value) {
+      if (value != field) {
+        field = value
+        invalidateSelf()
+      }
+    }
+
+  var offsetY: Float = offsetY
+    set(value) {
+      if (value != field) {
+        field = value
+        invalidateSelf()
+      }
+    }
+
+  var blurRadius: Float = blurRadius
+    set(value) {
+      if (value != field) {
+        field = value
+        shadowPaint.maskFilter = createBlurMaskFilter(value)
+        invalidateSelf()
+      }
+    }
+
+  var spread: Float = spread
+    set(value) {
+      if (value != field) {
+        field = value
+        invalidateSelf()
+      }
+    }
 
   private var needUpdatePath = true
   private val paddingBoxRect = RectF()
@@ -102,8 +153,15 @@ internal class InsetBoxShadowDrawable(
   }
 
   override fun setAlpha(alpha: Int) {
-    shadowPaint.alpha = (((alpha / 255f) * (Color.alpha(shadowColor) / 255f)) * 255f).roundToInt()
+    drawableAlpha = alpha
+    applyShadowColor()
     invalidateSelf()
+  }
+
+  private fun applyShadowColor() {
+    shadowPaint.color = shadowColor
+    shadowPaint.alpha =
+        (((drawableAlpha / 255f) * (Color.alpha(shadowColor) / 255f)) * 255f).roundToInt()
   }
 
   override fun setColorFilter(colorFilter: ColorFilter?) {
