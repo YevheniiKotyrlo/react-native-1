@@ -35,6 +35,7 @@ class MountItemDispatcherTest {
   private lateinit var dispatcher: MountItemDispatcher
   private var nowNanos: Long = 0L
   private var executedItems: Int = 0
+  private var displayFrameIntervalNanos: Long = SIXTY_HERTZ_FRAME_NANOS
 
   @Before
   fun setUp() {
@@ -44,7 +45,7 @@ class MountItemDispatcherTest {
     val mountingManager = mock<MountingManager>()
     whenever(mountingManager.surfaceIsStopped(any())).thenReturn(false)
     whenever(mountingManager.isWaitingForViewAttach(any())).thenReturn(false)
-    dispatcher = MountItemDispatcher(mountingManager, mock())
+    dispatcher = MountItemDispatcher(mountingManager, mock()) { displayFrameIntervalNanos }
   }
 
   @After
@@ -80,7 +81,7 @@ class MountItemDispatcherTest {
   }
 
   @Test
-  fun preMountsForHalfOfASixtyHertzFrameBeforeAnyFrameIntervalIsKnown() {
+  fun preMountsForHalfOfTheDisplaysFrameAtSixtyHertz() {
     queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
 
     // Items start at 0, 1, ... 8 ms; the one starting past 8.33 ms waits for the next frame.
@@ -88,48 +89,30 @@ class MountItemDispatcherTest {
   }
 
   @Test
-  fun preMountsForHalfOfTheFrameIntervalTheDisplayRunsAt() {
-    preMountFrame(FIRST_FRAME_NANOS)
-    preMountFrame(FIRST_FRAME_NANOS + ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS)
+  fun preMountsForHalfOfTheDisplaysFrameAtOneHundredTwentyHertz() {
+    displayFrameIntervalNanos = ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS
     queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
 
     // At 120 Hz half a frame is 4.17 ms: items start at 0 to 4 ms.
-    assertThat(preMountFrame(FIRST_FRAME_NANOS + 2 * ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS))
-        .isEqualTo(5)
+    assertThat(preMountFrame(FIRST_FRAME_NANOS)).isEqualTo(5)
   }
 
   @Test
-  fun aSkippedFrameDoesNotWidenTheBudget() {
-    preMountFrame(FIRST_FRAME_NANOS)
-    preMountFrame(FIRST_FRAME_NANOS + ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS)
+  fun theBudgetFollowsTheDisplayBackToSixtyHertz() {
+    displayFrameIntervalNanos = ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS
     queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
+    assertThat(preMountFrame(FIRST_FRAME_NANOS)).isEqualTo(5)
 
-    assertThat(preMountFrame(FIRST_FRAME_NANOS + 4 * ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS))
-        .isEqualTo(5)
-  }
+    displayFrameIntervalNanos = SIXTY_HERTZ_FRAME_NANOS
 
-  @Test
-  fun framesSlowerThanSixtyHertzKeepTheSixtyHertzBudget() {
-    preMountFrame(FIRST_FRAME_NANOS)
-    preMountFrame(FIRST_FRAME_NANOS + 40 * MILLISECOND_NANOS)
-    queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
-
-    assertThat(preMountFrame(FIRST_FRAME_NANOS + 80 * MILLISECOND_NANOS)).isEqualTo(9)
-  }
-
-  @Test
-  fun aRepeatedFrameTimestampDoesNotShrinkTheBudget() {
-    preMountFrame(FIRST_FRAME_NANOS)
-    preMountFrame(FIRST_FRAME_NANOS)
-    queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
-
-    assertThat(preMountFrame(FIRST_FRAME_NANOS + 20 * MILLISECOND_NANOS)).isEqualTo(9)
+    assertThat(preMountFrame(FIRST_FRAME_NANOS + SIXTY_HERTZ_FRAME_NANOS)).isEqualTo(9)
   }
 
   private companion object {
     const val SURFACE_ID: Int = 1
     const val MILLISECOND_NANOS: Long = 1_000_000L
     const val FIRST_FRAME_NANOS: Long = 1_000_000_000L
+    const val SIXTY_HERTZ_FRAME_NANOS: Long = 1_000_000_000L / 60
     const val ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS: Long = 1_000_000_000L / 120
   }
 }

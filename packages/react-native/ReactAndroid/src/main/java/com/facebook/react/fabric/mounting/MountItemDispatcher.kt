@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 internal class MountItemDispatcher(
     private val mountingManager: MountingManager,
     private val itemDispatchListener: ItemDispatchListener,
+    private val frameIntervalSource: FrameIntervalSource,
 ) {
   private val viewCommandMountItems: Queue<DispatchCommandMountItem> = ConcurrentLinkedQueue()
   private val mountItems: Queue<MountItem> = ConcurrentLinkedQueue()
@@ -54,10 +55,6 @@ internal class MountItemDispatcher(
     private set
 
   private var lastFrameTimeNanos: Long = 0L
-
-  // The display's frame at its fastest refresh rate: frame timestamps step by the vsync period, and
-  // by a multiple of it across a skipped frame.
-  private var shortestFrameIntervalNanos: Long = FRAME_TIME_NS
 
   fun addViewCommandMountItem(mountItem: DispatchCommandMountItem) {
     if (!ReactNativeFeatureFlags.disableEarlyViewCommandExecution()) {
@@ -333,14 +330,6 @@ internal class MountItemDispatcher(
   @UiThread
   @ThreadConfined(UI)
   fun dispatchPreMountItems(frameTimeNanos: Long) {
-    val frameIntervalNanos = frameTimeNanos - lastFrameTimeNanos
-    if (
-        lastFrameTimeNanos != 0L &&
-            frameIntervalNanos > 0L &&
-            frameIntervalNanos < shortestFrameIntervalNanos
-    ) {
-      shortestFrameIntervalNanos = frameIntervalNanos
-    }
     lastFrameTimeNanos = frameTimeNanos
 
     if (preMountItems.isEmpty()) {
@@ -348,7 +337,7 @@ internal class MountItemDispatcher(
       return
     }
 
-    val deadline = lastFrameTimeNanos + shortestFrameIntervalNanos / 2
+    val deadline = lastFrameTimeNanos + frameIntervalSource.frameIntervalNanos() / 2
     dispatchPreMountItemsImpl(deadline)
   }
 
@@ -431,10 +420,13 @@ internal class MountItemDispatcher(
     fun onItemsQueued()
   }
 
+  fun interface FrameIntervalSource {
+    /** The display's current frame interval; pre-mounting takes half of it each frame. */
+    fun frameIntervalNanos(): Long
+  }
+
   private companion object {
     private const val TAG: String = "MountItemDispatcher"
-
-    private const val FRAME_TIME_NS: Long = (1000000000 / 60).toLong()
 
     private fun <E> drainConcurrentItemQueue(queue: Queue<E>): List<E>? {
       if (queue.isEmpty()) {
