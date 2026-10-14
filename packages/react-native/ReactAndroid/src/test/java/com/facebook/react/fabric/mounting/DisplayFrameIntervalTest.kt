@@ -29,11 +29,26 @@ class DisplayFrameIntervalTest {
   }
 
   @Test
-  fun readsTheDefaultDisplaysFrame() {
-    setRefreshRate(120f)
+  fun readsTheDefaultDisplaysFrameAtEveryRefreshRate() {
+    val frameIntervalNanosByRefreshRate =
+        listOf(1f, 60f, 90f, 120f, 144f, 165f, 185f, 240f).associateWith { refreshRate ->
+          setRefreshRate(refreshRate)
+          DisplayFrameInterval(RuntimeEnvironment.getApplication()).frameIntervalNanos()
+        }
 
-    assertThat(DisplayFrameInterval(RuntimeEnvironment.getApplication()).frameIntervalNanos())
-        .isEqualTo(ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS)
+    assertThat(frameIntervalNanosByRefreshRate)
+        .isEqualTo(
+            mapOf(
+                1f to 1_000_000_000L,
+                60f to 16_666_666L,
+                90f to 11_111_111L,
+                120f to 8_333_333L,
+                144f to 6_944_444L,
+                165f to 6_060_606L,
+                185f to 5_405_405L,
+                240f to 4_166_666L,
+            )
+        )
   }
 
   @Test
@@ -60,11 +75,11 @@ class DisplayFrameIntervalTest {
   }
 
   @Test
-  fun takesASixtyHertzFrameWhenTheDisplayReportsNoRefreshRate() {
+  fun reportsNoFrameWhileTheDisplayReportsNoRefreshRate() {
     setRefreshRate(0f)
 
     assertThat(DisplayFrameInterval(RuntimeEnvironment.getApplication()).frameIntervalNanos())
-        .isEqualTo(SIXTY_HERTZ_FRAME_NANOS)
+        .isNull()
   }
 
   private companion object {

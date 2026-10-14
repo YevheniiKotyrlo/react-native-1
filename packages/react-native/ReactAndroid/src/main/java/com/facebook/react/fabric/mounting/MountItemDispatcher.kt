@@ -337,8 +337,15 @@ internal class MountItemDispatcher(
       return
     }
 
-    val deadline = lastFrameTimeNanos + frameIntervalSource.frameIntervalNanos() / 2
+    val deadline = lastFrameTimeNanos + computePreMountBudgetNanos()
     dispatchPreMountItemsImpl(deadline)
+  }
+
+  /** Half of the display's current frame, and never longer than [LONGEST_PRE_MOUNT_NANOS]. */
+  private fun computePreMountBudgetNanos(): Long {
+    val frameIntervalNanos =
+        frameIntervalSource.frameIntervalNanos() ?: return LONGEST_PRE_MOUNT_NANOS
+    return minOf(frameIntervalNanos / 2, LONGEST_PRE_MOUNT_NANOS)
   }
 
   private fun dispatchPreMountItemsImpl(deadline: Long) {
@@ -421,12 +428,18 @@ internal class MountItemDispatcher(
   }
 
   fun interface FrameIntervalSource {
-    /** The display's current frame interval; pre-mounting takes half of it each frame. */
-    fun frameIntervalNanos(): Long
+    /** The display's current frame interval, or null while the display reports no refresh rate. */
+    fun frameIntervalNanos(): Long?
   }
 
   private companion object {
     private const val TAG: String = "MountItemDispatcher"
+
+    /**
+     * The longest a frame pre-mounts for: half of a 60 Hz frame, so that below 60 Hz pre-mounting
+     * holds the UI thread no longer than it does at 60 Hz.
+     */
+    private const val LONGEST_PRE_MOUNT_NANOS: Long = 1_000_000_000L / 60 / 2
 
     private fun <E> drainConcurrentItemQueue(queue: Queue<E>): List<E>? {
       if (queue.isEmpty()) {

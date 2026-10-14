@@ -35,7 +35,7 @@ class MountItemDispatcherTest {
   private lateinit var dispatcher: MountItemDispatcher
   private var nowNanos: Long = 0L
   private var executedItems: Int = 0
-  private var displayFrameIntervalNanos: Long = SIXTY_HERTZ_FRAME_NANOS
+  private var displayFrameIntervalNanos: Long? = SIXTY_HERTZ_FRAME_NANOS
 
   @Before
   fun setUp() {
@@ -80,21 +80,35 @@ class MountItemDispatcherTest {
     return executedItems - before
   }
 
-  @Test
-  fun preMountsForHalfOfTheDisplaysFrameAtSixtyHertz() {
-    queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
+  /** Runs one frame at each refresh rate and returns how many items each frame pre-mounted. */
+  private fun preMountFrameAtEachRefreshRate(refreshRates: List<Int>): Map<Int, Int> =
+      refreshRates.withIndex().associate { (index, refreshRate) ->
+        displayFrameIntervalNanos = NANOSECONDS_PER_SECOND / refreshRate
+        queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
+        refreshRate to preMountFrame(FIRST_FRAME_NANOS + index * NANOSECONDS_PER_SECOND)
+      }
 
-    // Items start at 0, 1, ... 8 ms; the one starting past 8.33 ms waits for the next frame.
-    assertThat(preMountFrame(FIRST_FRAME_NANOS)).isEqualTo(9)
+  @Test
+  fun preMountsForHalfOfTheDisplaysFrameFromSixtyHertzUp() {
+    // Items start at 0, 1, 2, ... ms, and the first one starting past half of the frame waits for
+    // the next frame: half of a 60 Hz frame is 8.33 ms, of a 185 Hz frame 2.70 ms.
+    assertThat(preMountFrameAtEachRefreshRate(listOf(60, 90, 120, 144, 165, 185, 240)))
+        .isEqualTo(mapOf(60 to 9, 90 to 6, 120 to 5, 144 to 4, 165 to 4, 185 to 3, 240 to 3))
   }
 
   @Test
-  fun preMountsForHalfOfTheDisplaysFrameAtOneHundredTwentyHertz() {
-    displayFrameIntervalNanos = ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS
+  fun neverPreMountsLongerThanHalfOfASixtyHertzFrameBelowSixtyHertz() {
+    // Half of a 1 Hz frame would be 500 ms; every rate below 60 Hz keeps 8.33 ms.
+    assertThat(preMountFrameAtEachRefreshRate(listOf(1, 10, 24, 30, 48)))
+        .isEqualTo(mapOf(1 to 9, 10 to 9, 24 to 9, 30 to 9, 48 to 9))
+  }
+
+  @Test
+  fun preMountsForHalfOfASixtyHertzFrameWhileTheDisplayReportsNoRate() {
+    displayFrameIntervalNanos = null
     queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
 
-    // At 120 Hz half a frame is 4.17 ms: items start at 0 to 4 ms.
-    assertThat(preMountFrame(FIRST_FRAME_NANOS)).isEqualTo(5)
+    assertThat(preMountFrame(FIRST_FRAME_NANOS)).isEqualTo(9)
   }
 
   @Test
@@ -108,11 +122,23 @@ class MountItemDispatcherTest {
     assertThat(preMountFrame(FIRST_FRAME_NANOS + SIXTY_HERTZ_FRAME_NANOS)).isEqualTo(9)
   }
 
+  @Test
+  fun aSkippedFrameKeepsTheDisplaysBudget() {
+    displayFrameIntervalNanos = ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS
+    queuePreMountItems(count = 20, costNanos = MILLISECOND_NANOS)
+    assertThat(preMountFrame(FIRST_FRAME_NANOS)).isEqualTo(5)
+
+    // The next frame runs two vsyncs later; the budget still comes from the display.
+    assertThat(preMountFrame(FIRST_FRAME_NANOS + 2 * ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS))
+        .isEqualTo(5)
+  }
+
   private companion object {
     const val SURFACE_ID: Int = 1
     const val MILLISECOND_NANOS: Long = 1_000_000L
-    const val FIRST_FRAME_NANOS: Long = 1_000_000_000L
-    const val SIXTY_HERTZ_FRAME_NANOS: Long = 1_000_000_000L / 60
-    const val ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS: Long = 1_000_000_000L / 120
+    const val NANOSECONDS_PER_SECOND: Long = 1_000_000_000L
+    const val FIRST_FRAME_NANOS: Long = NANOSECONDS_PER_SECOND
+    const val SIXTY_HERTZ_FRAME_NANOS: Long = NANOSECONDS_PER_SECOND / 60
+    const val ONE_HUNDRED_TWENTY_HERTZ_FRAME_NANOS: Long = NANOSECONDS_PER_SECOND / 120
   }
 }

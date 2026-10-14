@@ -20,7 +20,8 @@ internal class DisplayFrameInterval(context: Context) :
     MountItemDispatcher.FrameIntervalSource, DisplayManager.DisplayListener {
   private val displayManager: DisplayManager? = context.getSystemService(DisplayManager::class.java)
 
-  @Volatile private var frameIntervalNanos: Long = readFrameIntervalNanos()
+  // From Android 16 a listener gets refresh-rate changes only once the process has read the rate.
+  @Volatile private var frameIntervalNanos: Long? = readFrameIntervalNanos()
 
   fun start() {
     displayManager?.registerDisplayListener(this, UiThreadUtil.getUiThreadHandler())
@@ -31,7 +32,7 @@ internal class DisplayFrameInterval(context: Context) :
     displayManager?.unregisterDisplayListener(this)
   }
 
-  override fun frameIntervalNanos(): Long = frameIntervalNanos
+  override fun frameIntervalNanos(): Long? = frameIntervalNanos
 
   override fun onDisplayChanged(displayId: Int) {
     if (displayId == Display.DEFAULT_DISPLAY) {
@@ -43,14 +44,12 @@ internal class DisplayFrameInterval(context: Context) :
 
   override fun onDisplayRemoved(displayId: Int): Unit = Unit
 
-  private fun readFrameIntervalNanos(): Long {
+  private fun readFrameIntervalNanos(): Long? {
     val refreshRate = displayManager?.getDisplay(Display.DEFAULT_DISPLAY)?.refreshRate ?: 0f
-    return if (refreshRate > 0f) (NANOSECONDS_PER_SECOND / refreshRate).toLong()
-    else SIXTY_HERTZ_FRAME_NANOS
+    return if (refreshRate > 0f) (NANOSECONDS_PER_SECOND / refreshRate).toLong() else null
   }
 
   private companion object {
     private const val NANOSECONDS_PER_SECOND: Double = 1_000_000_000.0
-    private const val SIXTY_HERTZ_FRAME_NANOS: Long = 1_000_000_000L / 60
   }
 }
