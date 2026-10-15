@@ -89,18 +89,30 @@ class MountItemDispatcherTest {
       }
 
   @Test
-  fun preMountsForHalfOfTheDisplaysFrameFromSixtyHertzUp() {
+  fun preMountsForHalfOfTheDisplaysFrameFromThirtyHertzUp() {
     // Items start at 0, 1, 2, ... ms, and the first one starting past half of the frame waits for
-    // the next frame: half of a 60 Hz frame is 8.33 ms, of a 185 Hz frame 2.70 ms.
-    assertThat(preMountFrameAtEachRefreshRate(listOf(60, 90, 120, 144, 165, 185, 240)))
-        .isEqualTo(mapOf(60 to 9, 90 to 6, 120 to 5, 144 to 4, 165 to 4, 185 to 3, 240 to 3))
+    // the next frame: half of a 30 Hz frame is 16.67 ms, of a 185 Hz frame 2.70 ms.
+    assertThat(preMountFrameAtEachRefreshRate(listOf(30, 48, 60, 90, 120, 144, 165, 185, 240)))
+        .isEqualTo(
+            mapOf(
+                30 to 17,
+                48 to 11,
+                60 to 9,
+                90 to 6,
+                120 to 5,
+                144 to 4,
+                165 to 4,
+                185 to 3,
+                240 to 3,
+            )
+        )
   }
 
   @Test
-  fun neverPreMountsLongerThanHalfOfASixtyHertzFrameBelowSixtyHertz() {
-    // Half of a 1 Hz frame would be 500 ms; every rate below 60 Hz keeps 8.33 ms.
-    assertThat(preMountFrameAtEachRefreshRate(listOf(1, 10, 24, 30, 48)))
-        .isEqualTo(mapOf(1 to 9, 10 to 9, 24 to 9, 30 to 9, 48 to 9))
+  fun neverPreMountsLongerThanHalfOfAThirtyHertzFrameBelowThirtyHertz() {
+    // Half of a 1 Hz frame would be 500 ms; every rate below 30 Hz keeps 16.67 ms.
+    assertThat(preMountFrameAtEachRefreshRate(listOf(1, 10, 24)))
+        .isEqualTo(mapOf(1 to 17, 10 to 17, 24 to 17))
   }
 
   @Test
