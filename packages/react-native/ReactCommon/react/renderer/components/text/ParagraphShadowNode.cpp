@@ -60,8 +60,17 @@ const char ParagraphComponentName[] = "Paragraph";
 
 void ParagraphShadowNode::initialize() noexcept {
 #ifdef ANDROID
-  if (getConcreteProps().isSelectable) {
+  // Android selects text only in a view that can take focus; otherwise the
+  // text views' keyboard focus takes `focusable` over `accessible`.
+  const auto& props = getConcreteProps();
+  if (props.isSelectable) {
     traits_.set(ShadowNodeTraits::Trait::KeyboardFocusable);
+  } else if (props.focusable.has_value()) {
+    if (*props.focusable) {
+      traits_.set(ShadowNodeTraits::Trait::KeyboardFocusable);
+    } else {
+      traits_.unset(ShadowNodeTraits::Trait::KeyboardFocusable);
+    }
   }
 #endif
 }

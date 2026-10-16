@@ -8,6 +8,7 @@
 package com.facebook.react.views.view
 
 import android.view.View
+import com.facebook.react.uimanager.ReactAxOrderHelper
 
 internal data class FocusProps(
     val focusable: Boolean? = null,
@@ -40,7 +41,29 @@ internal data class FocusProps(
         importantForAccessibility
       }
 
+  // Android selects text only in a view that can take focus.
+  fun forText(isSelectable: Boolean): FocusProps =
+      if (isSelectable) copy(focusable = true) else this
+
+  fun applyTo(view: View) {
+    ReactAxOrderHelper.setFocusable(view, isFocusable(view.isFocused))
+    ReactAxOrderHelper.setScreenReaderFocusable(view, isScreenReaderFocusable)
+    view.importantForAccessibility =
+        importantForAccessibility(hasContentDescription = !view.contentDescription.isNullOrEmpty())
+  }
+
+  fun onFocusChanged(view: View, gainFocus: Boolean) {
+    if (!gainFocus && focusableOnlyFromJS) {
+      ReactAxOrderHelper.setFocusable(view, false)
+    }
+  }
+
   companion object {
-    val DEFAULT: FocusProps = FocusProps()
+    @JvmField val DEFAULT: FocusProps = FocusProps()
+
+    // TextView's constructor makes the view important for accessibility.
+    @JvmField
+    val TEXT_DEFAULT: FocusProps =
+        FocusProps(importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES)
   }
 }

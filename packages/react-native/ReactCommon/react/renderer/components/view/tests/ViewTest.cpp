@@ -113,7 +113,7 @@ TEST(ViewTest, keyboardFocusableTraitTakesFocusableThenAccessible) {
   EXPECT_FALSE(isKeyboardFocusable(folly::dynamic::object("focusable", false)));
 }
 
-TEST(ViewTest, paragraphKeyboardFocusableTraitTakesFocusableOrAccessible) {
+TEST(ViewTest, paragraphKeyboardFocusableTraitTakesFocusableThenAccessible) {
   auto builder = simpleComponentBuilder();
   std::shared_ptr<ParagraphShadowNode> paragraph;
   builder.build(
@@ -127,8 +127,11 @@ TEST(ViewTest, paragraphKeyboardFocusableTraitTakesFocusableOrAccessible) {
   EXPECT_FALSE(isKeyboardFocusable(folly::dynamic::object()));
   EXPECT_TRUE(isKeyboardFocusable(folly::dynamic::object("accessible", true)));
   EXPECT_TRUE(isKeyboardFocusable(folly::dynamic::object("focusable", true)));
-  EXPECT_TRUE(isKeyboardFocusable(
+  EXPECT_TRUE(isKeyboardFocusable(folly::dynamic::object("selectable", true)));
+  EXPECT_FALSE(isKeyboardFocusable(
       folly::dynamic::object("accessible", true)("focusable", false)));
+  EXPECT_TRUE(isKeyboardFocusable(
+      folly::dynamic::object("selectable", true)("focusable", false)));
 }
 
 TEST(ViewTest, focusableFalseFormsNoViewWithoutImperativeFocus) {

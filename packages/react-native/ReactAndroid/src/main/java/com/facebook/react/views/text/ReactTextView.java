@@ -26,6 +26,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -45,6 +46,7 @@ import com.facebook.react.uimanager.LengthPercentage;
 import com.facebook.react.uimanager.LengthPercentageType;
 import com.facebook.react.uimanager.PixelUtil;
 import com.facebook.react.uimanager.ReactCompoundView;
+import com.facebook.react.uimanager.ScreenReaderFocusableHelper;
 import com.facebook.react.uimanager.ViewDefaults;
 import com.facebook.react.uimanager.style.BorderRadiusProp;
 import com.facebook.react.uimanager.style.BorderStyle;
@@ -55,6 +57,7 @@ import com.facebook.react.views.text.internal.span.CanvasEffectSpan;
 import com.facebook.react.views.text.internal.span.ReactAbsoluteSizeSpan;
 import com.facebook.react.views.text.internal.span.ReactFragmentIndexSpan;
 import com.facebook.react.views.text.internal.span.ReactTagSpan;
+import com.facebook.react.views.view.FocusProps;
 import com.facebook.yoga.YogaMeasureMode;
 import java.lang.reflect.Method;
 
@@ -83,6 +86,9 @@ public class ReactTextView extends AppCompatTextView implements ReactCompoundVie
   private boolean mTextIsSelectable;
   private boolean mShouldAdjustSpannableFontSize;
   private Overflow mOverflow = Overflow.VISIBLE;
+
+  private FocusProps mFocusProps = FocusProps.TEXT_DEFAULT;
+  private boolean mFocusPropsChanged;
 
   private @Nullable Spannable mSpanned;
   // Fitting the font size to the view shrinks the font size spans of mSpanned in place. These are
@@ -141,6 +147,8 @@ public class ReactTextView extends AppCompatTextView implements ReactCompoundVie
     mAdjustsFontSizeToFit = false;
     mLinkifyMaskType = 0;
     mTextIsSelectable = false;
+    mFocusProps = FocusProps.TEXT_DEFAULT;
+    mFocusPropsChanged = false;
     mShouldAdjustSpannableFontSize = false;
     mEllipsizeLocation = TextUtils.TruncateAt.END;
     mFontSize = Float.NaN;
@@ -551,6 +559,7 @@ public class ReactTextView extends AppCompatTextView implements ReactCompoundVie
   public void setTextIsSelectable(boolean selectable) {
     mTextIsSelectable = selectable;
     super.setTextIsSelectable(selectable);
+    getAppliedFocusProps().applyTo(this);
   }
 
   @Override
@@ -767,6 +776,33 @@ public class ReactTextView extends AppCompatTextView implements ReactCompoundVie
     mLinkifyMaskType = mask;
   }
 
+  /* package */ FocusProps getFocusProps() {
+    return mFocusProps;
+  }
+
+  /* package */ void updateFocusProps(FocusProps focusProps) {
+    mFocusProps = focusProps;
+    mFocusPropsChanged = true;
+  }
+
+  /* package */ void applyFocusProps() {
+    if (!mFocusPropsChanged) {
+      return;
+    }
+    mFocusPropsChanged = false;
+    getAppliedFocusProps().applyTo(this);
+  }
+
+  private FocusProps getAppliedFocusProps() {
+    return mFocusProps.forText(mTextIsSelectable);
+  }
+
+  @Override
+  public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+    super.onInitializeAccessibilityNodeInfo(info);
+    ScreenReaderFocusableHelper.INSTANCE.initializeAccessibilityNodeInfo(this, info);
+  }
+
   @Override
   protected boolean dispatchHoverEvent(MotionEvent event) {
     // if this view has an accessibility delegate set, and that delegate supports virtual view
@@ -795,6 +831,7 @@ public class ReactTextView extends AppCompatTextView implements ReactCompoundVie
   public final void onFocusChanged(
       boolean gainFocus, int direction, @Nullable Rect previouslyFocusedRect) {
     super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+    getAppliedFocusProps().onFocusChanged(this, gainFocus);
     AccessibilityDelegateCompat accessibilityDelegateCompat =
         ViewCompat.getAccessibilityDelegate(this);
     if (accessibilityDelegateCompat != null
