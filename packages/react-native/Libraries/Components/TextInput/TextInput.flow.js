@@ -855,6 +855,12 @@ type TextInputBaseProps = Readonly<{
   onKeyPress?: ?(e: TextInputKeyPressEvent) => unknown,
 
   /**
+   * Called when a touch is held for 500ms. The release that follows does not
+   * call `onPress`.
+   */
+  onLongPress?: ?(event: GestureResponderEvent) => unknown,
+
+  /**
    * Called when a single tap gesture is detected.
    */
   onPress?: ?(event: GestureResponderEvent) => unknown,

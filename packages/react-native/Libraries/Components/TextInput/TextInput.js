@@ -468,6 +468,7 @@ function InternalTextInput(props: TextInputProps): React.Node {
   const {
     editable,
     hitSlop,
+    onLongPress,
     onPress,
     onPressIn,
     onPressOut,
@@ -478,6 +479,7 @@ function InternalTextInput(props: TextInputProps): React.Node {
     () => ({
       cancelable: Platform.OS === 'ios' ? !rejectResponderTermination : null,
       hitSlop,
+      onLongPress,
       onPress: (event: GestureResponderEvent) => {
         onPress?.(event);
         if (editable !== false) {
@@ -492,6 +494,7 @@ function InternalTextInput(props: TextInputProps): React.Node {
     [
       editable,
       hitSlop,
+      onLongPress,
       onPress,
       onPressIn,
       onPressOut,
