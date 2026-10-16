@@ -312,9 +312,12 @@ describe('<TextInput>', () => {
 
         timers.advanceTimersByTime(1);
         expect(onLongPress).toHaveBeenCalledTimes(1);
+
+        touchEnd(element);
+        timers.runAllTimers();
       });
 
-      it('takes the place of the press, so the release calls no onPress and sends no focus command', () => {
+      it('focuses the input as a press does, and the release that follows calls no onPress', () => {
         const root = Fantom.createRoot();
         const nodeRef = createRef<HostInstance>();
         const onPress = jest.fn();
@@ -336,14 +339,18 @@ describe('<TextInput>', () => {
         const element = nullthrows(nodeRef.current);
         touchStart(element);
         timers.advanceTimersByTime(500);
+
+        expect(root.takeMountingManagerLogs()).toEqual([
+          'Command {type: "AndroidTextInput", nativeID: "text-input", name: "focus"}',
+        ]);
+
         touchEnd(element);
         timers.runAllTimers();
 
         expect(onPress).toHaveBeenCalledTimes(0);
-        expect(root.takeMountingManagerLogs()).toEqual([]);
       });
 
-      it('leaves a press released before the delay a press that focuses', () => {
+      it('does not change a press released before the delay, which calls onPress and focuses', () => {
         const root = Fantom.createRoot();
         const nodeRef = createRef<HostInstance>();
         const onLongPress = jest.fn();
@@ -376,7 +383,7 @@ describe('<TextInput>', () => {
         ]);
       });
 
-      it('leaves a held press a press that focuses when it is not set', () => {
+      it('when not set, leaves a held press calling onPress and focusing', () => {
         const root = Fantom.createRoot();
         const nodeRef = createRef<HostInstance>();
         const onPress = jest.fn();
