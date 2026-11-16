@@ -246,48 +246,86 @@ export function run(
 
   const testerPath = getFantomTesterPath(options);
 
-  if (profileCpp) {
-    // Ensure output directory exists
-    if (!fs.existsSync(CPP_TRACES_OUTPUT_PATH)) {
-      fs.mkdirSync(CPP_TRACES_OUTPUT_PATH, {recursive: true});
-    }
-
-    // Generate unique output path for perf data
-    const perfOutputPath = path.join(
-      CPP_TRACES_OUTPUT_PATH,
-      `perf-${Date.now()}.data`,
-    );
-
-    // Wrap command with perf record
-    // -g: enable call-graph (stack traces)
-    // -F 997: sample at 997 Hz (prime number to avoid aliasing)
-    // --call-graph dwarf: use DWARF for accurate stack traces
-    const result = runCommand(
-      'perf',
-      [
-        'record',
-        '-g',
-        '-F',
-        '997',
-        '--call-graph',
-        'dwarf',
-        '-o',
-        perfOutputPath,
-        '--',
-        testerPath,
-        ...args,
-      ],
-      {},
-    );
-
-    // Log the output path after the command starts
-    console.log(
-      `\n🔥 C++ sampling profiler recording to: ${perfOutputPath}\n` +
-        `   View with: perf report -i ${perfOutputPath}\n`,
-    );
-
-    return result;
+  if (profileCpp == null) {
+    return runCommand(testerPath, args, env);
   }
 
-  return runCommand(testerPath, args, env);
+  switch (profileCpp) {
+    case 'perf':
+      return runWithPerf(testerPath, args);
+    case 'callgrind':
+      return runWithCallgrind(testerPath, args);
+    default:
+      profileCpp as empty;
+      throw new TypeError(`Unexpected C++ profiler: ${profileCpp}`);
+  }
+}
+
+// Workers profile at the same time, so each recording names its process.
+function getCppTraceOutputPath(name: string, extension: string): string {
+  fs.mkdirSync(CPP_TRACES_OUTPUT_PATH, {recursive: true});
+  return path.join(
+    CPP_TRACES_OUTPUT_PATH,
+    `${name}-${Date.now()}-${process.pid}.${extension}`,
+  );
+}
+
+function runWithPerf(
+  testerPath: string,
+  args: ReadonlyArray<string>,
+): AsyncCommandResult {
+  const perfOutputPath = getCppTraceOutputPath('perf', 'data');
+
+  // -F 997: sample at 997 Hz (prime number to avoid aliasing)
+  // --call-graph dwarf: use DWARF for accurate stack traces
+  const result = runCommand(
+    'perf',
+    [
+      'record',
+      '-g',
+      '-F',
+      '997',
+      '--call-graph',
+      'dwarf',
+      '-o',
+      perfOutputPath,
+      '--',
+      testerPath,
+      ...args,
+    ],
+    {},
+  );
+
+  console.log(
+    `\n🔥 C++ sampling profiler recording to: ${perfOutputPath}\n` +
+      `   View with: perf report -i ${perfOutputPath}\n`,
+  );
+
+  return result;
+}
+
+function runWithCallgrind(
+  testerPath: string,
+  args: ReadonlyArray<string>,
+): AsyncCommandResult {
+  const callgrindOutputPath = getCppTraceOutputPath('callgrind', 'out');
+
+  const result = runCommand(
+    'valgrind',
+    [
+      '--tool=callgrind',
+      `--callgrind-out-file=${callgrindOutputPath}`,
+      '--',
+      testerPath,
+      ...args,
+    ],
+    {},
+  );
+
+  console.log(
+    `\n🔥 C++ instruction profiler recording to: ${callgrindOutputPath}\n` +
+      `   View with: callgrind_annotate ${callgrindOutputPath}\n`,
+  );
+
+  return result;
 }

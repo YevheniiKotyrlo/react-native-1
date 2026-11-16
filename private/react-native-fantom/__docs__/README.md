@@ -549,14 +549,26 @@ fantom test with the flag `FANTOM_PROFILE_CPP`:
 FANTOM_PROFILE_CPP=1 yarn fantom <regexForTestFiles>
 ```
 
-Output is saved to `.out/cpp-traces/perf-<timestamp>.data`. Analyze it with:
+Output is saved to `.out/cpp-traces/perf-<timestamp>-<pid>.data`. Analyze it
+with:
 
 ```shell
-perf report -i .out/cpp-traces/perf-<timestamp>.data
+perf report -i .out/cpp-traces/perf-<timestamp>-<pid>.data
 ```
 
 This is not available on CI (the runner will throw an error if attempted) and
 requires `perf` to be installed on the host.
+
+To count instructions with Valgrind's Callgrind instead, set the flag to
+`callgrind`:
+
+```shell
+FANTOM_PROFILE_CPP=callgrind yarn fantom <regexForTestFiles>
+```
+
+Output is saved to `.out/cpp-traces/callgrind-<timestamp>-<pid>.out`. Analyze it
+with `callgrind_annotate` or KCachegrind. Like `perf`, it is not available on
+CI, and it requires `valgrind` to be installed on the host.
 
 ### Running the full suite locally
 

@@ -36,6 +36,41 @@ function loadEnvironmentOptions(
   return require('../EnvironmentOptions');
 }
 
+describe('profileCpp', () => {
+  it('records no profile when FANTOM_PROFILE_CPP is unset or empty', () => {
+    expect(loadEnvironmentOptions({}).profileCpp).toBe(null);
+    expect(loadEnvironmentOptions({FANTOM_PROFILE_CPP: ''}).profileCpp).toBe(
+      null,
+    );
+  });
+
+  it('samples with perf for any value but callgrind', () => {
+    expect(loadEnvironmentOptions({FANTOM_PROFILE_CPP: '1'}).profileCpp).toBe(
+      'perf',
+    );
+    expect(
+      loadEnvironmentOptions({FANTOM_PROFILE_CPP: 'perf'}).profileCpp,
+    ).toBe('perf');
+  });
+
+  it('runs Callgrind for callgrind', () => {
+    expect(
+      loadEnvironmentOptions({FANTOM_PROFILE_CPP: 'callgrind'}).profileCpp,
+    ).toBe('callgrind');
+  });
+
+  it('rejects either profiler on CI', () => {
+    for (const profiler of ['1', 'callgrind']) {
+      expect(() =>
+        loadEnvironmentOptions({
+          FANTOM_FORCE_CI_MODE: '1',
+          FANTOM_PROFILE_CPP: profiler,
+        }).validateEnvironmentVariables(),
+      ).toThrow('Cannot run Fantom with C++ profiling on CI');
+    }
+  });
+});
+
 describe('validateEnvironmentVariables', () => {
   it('rejects C++ debugging in OSS, which runs the tester through Buck', () => {
     expect(() =>
