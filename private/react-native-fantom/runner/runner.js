@@ -553,7 +553,7 @@ module.exports = async function runTest(
         const formattedFantomConfig = formatFantomConfig(testConfig);
         if (formattedFantomConfig) {
           result.ancestorTitles.unshift(
-            `${path.basename(testPath, '-itest.js')} (${formatFantomConfig(testConfig)})`,
+            `${path.basename(testPath).replace(/-itest\.(js|tsx?)$/, '')} (${formatFantomConfig(testConfig)})`,
           );
         }
       });
