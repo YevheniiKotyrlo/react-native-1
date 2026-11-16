@@ -8,6 +8,7 @@
  * @format
  */
 
+import type {CppProfiler} from './EnvironmentOptions';
 import type {FantomTestConfig} from './getFantomTestConfigs';
 
 import formatFantomConfig from './formatFantomConfig';
@@ -62,54 +63,69 @@ export function getTestBuildOutputPath(): string {
   return path.join(JS_BUILD_OUTPUT_PATH, fantomRunID);
 }
 
-export function buildJSTracesOutputPath({
-  testPath,
-  testConfig,
-  isMultiConfigTest,
-}: {
+type TraceSource = Readonly<{
   testPath: string,
   testConfig: FantomTestConfig,
   isMultiConfigTest: boolean,
-}): string {
-  const fileNameParts = [path.basename(testPath)];
+}>;
 
-  if (isMultiConfigTest) {
-    const configSummary = formatFantomConfig(testConfig, {style: 'short'});
-    if (configSummary !== '') {
-      fileNameParts.push(configSummary);
-    }
-  }
+function getTraceFileNameParts({
+  testPath,
+  testConfig,
+  isMultiConfigTest,
+}: TraceSource): ReadonlyArray<string> {
+  const configSummary = isMultiConfigTest
+    ? formatFantomConfig(testConfig, {style: 'short'})
+    : '';
+  return configSummary !== ''
+    ? [path.basename(testPath), configSummary]
+    : [path.basename(testPath)];
+}
 
-  fileNameParts.push(new Date().toISOString());
+function getTraceFileName(source: TraceSource, startedAt: Date): string {
+  return [...getTraceFileNameParts(source), startedAt.toISOString()].join('-');
+}
 
-  const fileName = fileNameParts.join('-') + '.cpuprofile';
+const CPP_TRACE_EXTENSIONS: Readonly<{perf: string, callgrind: string}> = {
+  perf: 'perf.data',
+  callgrind: 'callgrind.out',
+};
 
-  return path.join(JS_TRACES_OUTPUT_PATH, fileName);
+// A recording made outside a test, by the REPL, is named after the tester.
+export function buildCppTracesOutputPath(
+  source: ?TraceSource,
+  profiler: CppProfiler,
+  startedAt: Date,
+): string {
+  const name =
+    source != null
+      ? getTraceFileName(source, startedAt)
+      : `fantom-tester-${startedAt.toISOString()}`;
+  return path.join(
+    CPP_TRACES_OUTPUT_PATH,
+    `${name}.${CPP_TRACE_EXTENSIONS[profiler]}`,
+  );
+}
+
+export function buildJSTracesOutputPath(
+  source: TraceSource,
+  startedAt: Date,
+): string {
+  return path.join(
+    JS_TRACES_OUTPUT_PATH,
+    getTraceFileName(source, startedAt) + '.cpuprofile',
+  );
 }
 
 const JS_HEAP_SNAPSHOT_OUTPUT_PATH_TOKEN = '${timestamp}';
 
-export function buildJSHeapSnapshotsOutputPathTemplate({
-  testPath,
-  testConfig,
-  isMultiConfigTest,
-}: {
-  testPath: string,
-  testConfig: FantomTestConfig,
-  isMultiConfigTest: boolean,
-}): [string, string] {
-  const fileNameParts = [path.basename(testPath)];
-
-  if (isMultiConfigTest) {
-    const configSummary = formatFantomConfig(testConfig, {style: 'short'});
-    if (configSummary !== '') {
-      fileNameParts.push(configSummary);
-    }
-  }
-
-  fileNameParts.push(JS_HEAP_SNAPSHOT_OUTPUT_PATH_TOKEN);
-
-  const fileName = fileNameParts.join('-') + '.heapsnapshot';
+export function buildJSHeapSnapshotsOutputPathTemplate(
+  source: TraceSource,
+): [string, string] {
+  const fileName =
+    [...getTraceFileNameParts(source), JS_HEAP_SNAPSHOT_OUTPUT_PATH_TOKEN].join(
+      '-',
+    ) + '.heapsnapshot';
 
   return [
     path.join(JS_HEAP_SNAPSHOTS_OUTPUT_PATH, fileName),

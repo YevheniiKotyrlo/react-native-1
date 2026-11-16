@@ -17,6 +17,7 @@ import {
 import {HermesVariant} from '../../utils';
 import {
   GRADLE_TESTER_BUILDS,
+  getCppProfilerCommand,
   getGradleTesterPath,
   selectGradleTester,
 } from '../tester';
@@ -31,6 +32,7 @@ jest.mock('node:child_process', () => ({
 jest.mock('node:fs', () => ({
   ...jest.requireActual('node:fs'),
   existsSync: jest.fn(),
+  mkdirSync: jest.fn(),
 }));
 
 jest.mock('../../utils', () => ({
@@ -102,7 +104,7 @@ function loadOSSTester(
     Readonly<{status: ?number, signal?: ?string, error?: ?Error}>,
   >,
   existsSync: JestMockFn<[string], boolean>,
-  runCommand: JestMockFn<ReadonlyArray<unknown>, void>,
+  runCommand: JestMockFn<ReadonlyArray<unknown>, unknown>,
   warn: JestMockFn<ReadonlyArray<unknown>, void>,
 }> {
   replaceFantomEnvironment({...fantomVariables, FANTOM_FORCE_OSS_BUILD: '1'});
@@ -343,6 +345,7 @@ describe('an OSS run', () => {
       FANTOM_PROFILE_CPP: '1',
     });
     existsSync.mockReturnValue(true);
+    runCommand.mockReturnValue({childProcess: {once: () => {}}});
 
     tester.run(['--bundle'], DEV_TESTER_OPTIONS, {});
 
@@ -358,5 +361,57 @@ describe('an OSS run', () => {
         {},
       ],
     ]);
+  });
+});
+
+describe('getCppProfilerCommand', () => {
+  it('samples the tester with perf, call graphs from DWARF', () => {
+    expect(
+      getCppProfilerCommand(
+        'perf',
+        '/build/fantom_tester',
+        ['--bundlePath', 'a.js'],
+        '/traces/a.perf.data',
+      ),
+    ).toEqual({
+      command: 'perf',
+      args: [
+        'record',
+        '-g',
+        '-F',
+        '997',
+        '--call-graph',
+        'dwarf',
+        '-o',
+        '/traces/a.perf.data',
+        '--',
+        '/build/fantom_tester',
+        '--bundlePath',
+        'a.js',
+      ],
+      viewCommand: 'perf report -i /traces/a.perf.data',
+    });
+  });
+
+  it('runs the tester under Callgrind', () => {
+    expect(
+      getCppProfilerCommand(
+        'callgrind',
+        '/build/fantom_tester',
+        ['--bundlePath', 'a.js'],
+        '/traces/a.callgrind.out',
+      ),
+    ).toEqual({
+      command: 'valgrind',
+      args: [
+        '--tool=callgrind',
+        '--callgrind-out-file=/traces/a.callgrind.out',
+        '--',
+        '/build/fantom_tester',
+        '--bundlePath',
+        'a.js',
+      ],
+      viewCommand: 'callgrind_annotate /traces/a.callgrind.out',
+    });
   });
 });

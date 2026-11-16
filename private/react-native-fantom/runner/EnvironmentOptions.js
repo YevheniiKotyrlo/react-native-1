@@ -67,11 +67,26 @@ export const debugJS: boolean = Boolean(process.env.FANTOM_DEBUG_JS);
 
 export const profileJS: boolean = Boolean(process.env.FANTOM_PROFILE_JS);
 
+export type CppProfiler = 'perf' | 'callgrind';
+
+const CPP_PROFILERS: ReadonlyMap<string, CppProfiler> = new Map([
+  ['1', 'perf'],
+  ['true', 'perf'],
+  ['perf', 'perf'],
+  ['callgrind', 'callgrind'],
+]);
+
+const cppProfilerVariable = process.env.FANTOM_PROFILE_CPP;
+
 /**
- * Enables C++ sampling profiler using Linux perf.
- * Saves perf.data files to .out/cpp-traces/ for analysis.
+ * Records the C++ side of each test: `1` or `perf` samples the tester with
+ * Linux perf, and `callgrind` runs it under Valgrind's Callgrind. Saves the
+ * recordings to .out/cpp-traces/ for analysis.
  */
-export const profileCpp: boolean = Boolean(process.env.FANTOM_PROFILE_CPP);
+export const profileCpp: ?CppProfiler =
+  cppProfilerVariable == null || cppProfilerVariable === ''
+    ? null
+    : (CPP_PROFILERS.get(cppProfilerVariable) ?? null);
 
 /**
  * Enables address sanitizer (ASAN) build mode for the C++ side.
@@ -111,7 +126,23 @@ export function validateEnvironmentVariables(): void {
     throw new Error('Cannot run Fantom with C++ debugging in OSS');
   }
 
-  if (isCI && profileCpp) {
+  if (
+    cppProfilerVariable != null &&
+    cppProfilerVariable !== '' &&
+    profileCpp == null
+  ) {
+    throw new Error(
+      `FANTOM_PROFILE_CPP takes ${Array.from(CPP_PROFILERS.keys()).join(', ')}, not ${cppProfilerVariable}`,
+    );
+  }
+
+  if (profileCpp === 'callgrind' && (enableASAN || enableTSAN)) {
+    throw new Error(
+      'Cannot run a tester built with a sanitizer under Callgrind',
+    );
+  }
+
+  if (isCI && profileCpp != null) {
     throw new Error('Cannot run Fantom with C++ profiling on CI');
   }
 

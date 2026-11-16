@@ -8,6 +8,7 @@
  * @format
  */
 
+import type {CppProfiler} from '../EnvironmentOptions';
 import type {
   AsyncCommandResult,
   EnvironmentOverrides,
@@ -24,10 +25,10 @@ import {
   profileCpp,
 } from '../EnvironmentOptions';
 import {
-  CPP_TRACES_OUTPUT_PATH,
   GRADLE_BUILD_OUTPUT_PATH,
   NATIVE_BUILD_OUTPUT_PATH,
   PROJECT_ROOT,
+  buildCppTracesOutputPath,
 } from '../paths';
 import {
   getBuckModesForPlatform,
@@ -227,10 +228,63 @@ export function build(options: TesterOptions, env: EnvironmentOverrides): void {
   }
 }
 
+export type CppProfilerCommand = Readonly<{
+  command: string,
+  args: ReadonlyArray<string>,
+  viewCommand: string,
+}>;
+
+export function getCppProfilerCommand(
+  profiler: CppProfiler,
+  testerPath: string,
+  testerArgs: ReadonlyArray<string>,
+  outputPath: string,
+): CppProfilerCommand {
+  switch (profiler) {
+    case 'perf':
+      return {
+        command: 'perf',
+        // -g: enable call-graph (stack traces)
+        // -F 997: sample at 997 Hz (prime number to avoid aliasing)
+        // --call-graph dwarf: use DWARF for accurate stack traces
+        args: [
+          'record',
+          '-g',
+          '-F',
+          '997',
+          '--call-graph',
+          'dwarf',
+          '-o',
+          outputPath,
+          '--',
+          testerPath,
+          ...testerArgs,
+        ],
+        viewCommand: `perf report -i ${outputPath}`,
+      };
+    case 'callgrind':
+      return {
+        command: 'valgrind',
+        args: [
+          '--tool=callgrind',
+          `--callgrind-out-file=${outputPath}`,
+          '--',
+          testerPath,
+          ...testerArgs,
+        ],
+        viewCommand: `callgrind_annotate ${outputPath}`,
+      };
+    default:
+      profiler as empty;
+      throw new TypeError(`Unexpected C++ profiler: ${profiler}`);
+  }
+}
+
 export function run(
   args: ReadonlyArray<string>,
   options: TesterOptions,
   env: EnvironmentOverrides,
+  cppTraceOutputPath?: string,
 ): AsyncCommandResult {
   if (!isCI && !isOSS && !debugCpp) {
     build(options, env);
@@ -258,48 +312,24 @@ export function run(
 
   const testerPath = getFantomTesterPath(options);
 
-  if (profileCpp) {
-    // Ensure output directory exists
-    if (!fs.existsSync(CPP_TRACES_OUTPUT_PATH)) {
-      fs.mkdirSync(CPP_TRACES_OUTPUT_PATH, {recursive: true});
-    }
-
-    // Generate unique output path for perf data
-    const perfOutputPath = path.join(
-      CPP_TRACES_OUTPUT_PATH,
-      `perf-${Date.now()}.data`,
-    );
-
-    // Wrap command with perf record
-    // -g: enable call-graph (stack traces)
-    // -F 997: sample at 997 Hz (prime number to avoid aliasing)
-    // --call-graph dwarf: use DWARF for accurate stack traces
-    const result = runCommand(
-      'perf',
-      [
-        'record',
-        '-g',
-        '-F',
-        '997',
-        '--call-graph',
-        'dwarf',
-        '-o',
-        perfOutputPath,
-        '--',
-        testerPath,
-        ...args,
-      ],
-      {},
-    );
-
-    // Log the output path after the command starts
-    console.log(
-      `\n🔥 C++ sampling profiler recording to: ${perfOutputPath}\n` +
-        `   View with: perf report -i ${perfOutputPath}\n`,
-    );
-
-    return result;
+  if (profileCpp == null) {
+    return runCommand(testerPath, args, env);
   }
 
-  return runCommand(testerPath, args, env);
+  const outputPath =
+    cppTraceOutputPath ??
+    buildCppTracesOutputPath(null, profileCpp, new Date());
+  fs.mkdirSync(path.dirname(outputPath), {recursive: true});
+  const {
+    command,
+    args: profilerArgs,
+    viewCommand,
+  } = getCppProfilerCommand(profileCpp, testerPath, args, outputPath);
+  const result = runCommand(command, profilerArgs, env);
+  result.childProcess.once('spawn', () => {
+    console.log(
+      `\n🔥 C++ ${profileCpp} recording to: ${outputPath}\n   View with: ${viewCommand}\n`,
+    );
+  });
+  return result;
 }

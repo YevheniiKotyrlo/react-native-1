@@ -45,6 +45,7 @@ import processLLVMCoverage from './llvm/processLLVMCoverage';
 import {
   JS_HEAP_SNAPSHOTS_OUTPUT_PATH,
   JS_TRACES_OUTPUT_PATH,
+  buildCppTracesOutputPath,
   buildJSHeapSnapshotsOutputPathTemplate,
   buildJSTracesOutputPath,
   getTestBuildOutputPath,
@@ -340,22 +341,21 @@ module.exports = async function runTest(
       continue;
     }
 
+    const traceSource = {
+      testPath,
+      testConfig,
+      isMultiConfigTest: testConfigs.length > 1,
+    };
+    const startedAt = new Date();
+
     const jsTraceOutputPath = EnvironmentOptions.profileJS
-      ? buildJSTracesOutputPath({
-          testPath,
-          testConfig,
-          isMultiConfigTest: testConfigs.length > 1,
-        })
+      ? buildJSTracesOutputPath(traceSource, startedAt)
       : null;
 
     const [
       jsHeapSnapshotOutputPathTemplate,
       jsHeapSnapshotOutputPathTemplateToken,
-    ] = buildJSHeapSnapshotsOutputPathTemplate({
-      testPath,
-      testConfig,
-      isMultiConfigTest: testConfigs.length > 1,
-    });
+    ] = buildJSHeapSnapshotsOutputPathTemplate(traceSource);
 
     const entrypointContents = entrypointTemplate({
       testPath: `${path.relative(TEST_BUILD_OUTPUT_PATH, testPath)}`,
@@ -443,6 +443,13 @@ module.exports = async function runTest(
       rnTesterCommandArgs,
       rnTesterOptions,
       env,
+      EnvironmentOptions.profileCpp != null
+        ? buildCppTracesOutputPath(
+            traceSource,
+            EnvironmentOptions.profileCpp,
+            startedAt,
+          )
+        : undefined,
     );
 
     const [processedResult, benchmarkResult] =

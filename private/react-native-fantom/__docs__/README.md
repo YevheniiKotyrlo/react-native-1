@@ -564,14 +564,31 @@ fantom test with the flag `FANTOM_PROFILE_CPP`:
 FANTOM_PROFILE_CPP=1 yarn fantom <regexForTestFiles>
 ```
 
-Output is saved to `.out/cpp-traces/perf-<timestamp>.data`. Analyze it with:
+Output is saved to `.out/cpp-traces/<test file>-<timestamp>.perf.data`. Analyze
+it with:
 
 ```shell
-perf report -i .out/cpp-traces/perf-<timestamp>.data
+perf report -i .out/cpp-traces/<test file>-<timestamp>.perf.data
 ```
 
 This is not available on CI (the runner will throw an error if attempted) and
 requires `perf` to be installed on the host.
+
+#### C++ instruction profiler
+
+To count the instructions the tester runs with Valgrind's Callgrind instead, set
+the flag to `callgrind`:
+
+```shell
+FANTOM_PROFILE_CPP=callgrind yarn fantom <regexForTestFiles>
+```
+
+Output is saved to `.out/cpp-traces/<test file>-<timestamp>.callgrind.out`.
+Analyze it with `callgrind_annotate` or KCachegrind. Valgrind takes further
+options, such as `--toggle-collect`, from `VALGRIND_OPTS`. Like `perf`, it is
+not available on CI, and it requires Valgrind 3.20 or newer on the host, which
+reads the DWARF 5 debug info clang writes. It cannot run a tester built with a
+sanitizer.
 
 ### Running the full suite locally
 
