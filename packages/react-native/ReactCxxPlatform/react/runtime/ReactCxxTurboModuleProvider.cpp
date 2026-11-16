@@ -7,6 +7,7 @@
 
 #include "ReactCxxTurboModuleProvider.h"
 
+#include <ReactCommon/CxxTurboModuleUtils.h>
 #include <react/coremodules/AppStateModule.h>
 #include <react/coremodules/DeviceInfoModule.h>
 #include <react/coremodules/PlatformConstantsModule.h>
@@ -109,6 +110,12 @@ std::shared_ptr<TurboModule> ReactCxxTurboModuleProvider::operator()(
   if (auto turboModule =
           DefaultTurboModules::getTurboModule(name, jsInvoker_)) {
     return turboModule;
+  }
+
+  const auto& cxxTurboModuleMap = globalExportedCxxTurboModuleMap();
+  if (auto registeredModule = cxxTurboModuleMap.find(name);
+      registeredModule != cxxTurboModuleMap.end()) {
+    return registeredModule->second(jsInvoker_);
   }
 
   LOG(WARNING) << "Failed to load TurboModule: " << name;
