@@ -421,6 +421,23 @@ With an output such as:
     [...]
 ```
 
+### Linking native code
+
+The tester calls React Native's autolinking functions,
+`autolinking_cxxModuleProvider` and `autolinking_registerProviders`, as an app's
+`OnLoad.cpp` does, so a library's C++ TurboModules and components reach it. With
+no library linked, they provide nothing. To link one, build the tester with
+`fantomAutolinkingDirectory`, relative to the repository's root: a directory
+whose `CMakeLists.txt` defines `fantom_autolinking`, a library that implements
+those functions, as `autolinking.cpp` does in the folder React Native's Gradle
+plugin generates for an app, with `autolinking.h` in its public include
+directories.
+
+```shell
+./gradlew :private:react-native-fantom:buildFantomTester -PfantomAutolinkingDirectory=<directory>
+yarn fantom <regexForTestFiles>
+```
+
 ### Debugging
 
 > [!WARNING] Meta-only: debugging only works on Meta's internal infrastructure

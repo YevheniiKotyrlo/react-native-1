@@ -149,6 +149,14 @@ file(GLOB SOURCES
 list(APPEND SOURCES ${REACT_COMMON_DIR}/react/renderer/components/textinput/BaseTextInputProps.cpp)
 add_executable(fantom_tester ${SOURCES})
 
+# A directory whose CMakeLists.txt defines `fantom_autolinking`, implementing
+# React Native's autolinking functions for the libraries it links.
+if(FANTOM_AUTOLINKING_DIR)
+  add_subdirectory(${FANTOM_AUTOLINKING_DIR} autolinking)
+else()
+  add_subdirectory(autolinking)
+endif()
+
 target_include_directories(fantom_tester PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(fantom_tester
@@ -168,6 +176,9 @@ target_link_libraries(fantom_tester
 
     # codegen
     react_codegen_rncore
+
+    # autolinking
+    fantom_autolinking
 
     # ReactCommon
     bridgeless

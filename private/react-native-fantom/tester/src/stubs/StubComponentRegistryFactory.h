@@ -9,6 +9,7 @@
 
 #include "FantomTextInput.h"
 
+#include <autolinking.h>
 #include <react/renderer/componentregistry/ComponentDescriptorFactory.h>
 #include <react/renderer/componentregistry/ComponentDescriptorProviderRegistry.h>
 #include <react/renderer/components/image/ImageComponentDescriptor.h>
@@ -46,6 +47,7 @@ inline ComponentRegistryFactory getDefaultComponentRegistryFactory(std::shared_p
           concreteComponentDescriptorProvider<FantomTextInputComponentDescriptor<FantomSinglelineTextInputName>>());
       providerRegistry->add(
           concreteComponentDescriptorProvider<FantomTextInputComponentDescriptor<FantomMultilineTextInputName>>());
+      autolinking_registerProviders(providerRegistry);
       return providerRegistry;
     }();
     return providerRegistry->createComponentDescriptorRegistry(

@@ -15,6 +15,7 @@
 #include "stubs/StubQueue.h"
 #include "stubs/StubWebSocketClient.h"
 
+#include <autolinking.h>
 #include <folly/dynamic.h>
 #include <folly/json.h>
 #include <glog/logging.h>
@@ -117,7 +118,8 @@ TesterAppDelegate::TesterAppDelegate(
           return nullptr;
         }
       },
-      TesterTurboModuleProvider::getTurboModuleProvider()};
+      TesterTurboModuleProvider::getTurboModuleProvider(),
+      &autolinking_cxxModuleProvider};
 
   g_setNativeAnimatedNowTimestampFunction(StubClock::now);
 
