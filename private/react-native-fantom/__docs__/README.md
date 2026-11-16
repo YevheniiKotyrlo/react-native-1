@@ -421,6 +421,37 @@ With an output such as:
     [...]
 ```
 
+### Metro config
+
+Fantom bundles tests with [its own Metro config](../config/metro.config.js). To
+bundle them with another, name its file in `FANTOM_METRO_CONFIG_PATH`, relative
+to the repository's root. That config composes Fantom's with `mergeConfig`, as
+an app's config composes `getDefaultConfig`. It keeps Fantom's `projectRoot` and
+serves files from it, since Fantom requests each bundle by its path from the
+repository's root, and Fantom stops a run whose config does not. It also keeps
+Fantom's `babelTransformerPath`, or a transformer that wraps it, since that
+transformer adds JavaScript coverage and the `FANTOM_DEBUG_JS` breakpoints:
+
+```javascript
+const {mergeConfig} = require('metro-config');
+const path = require('node:path');
+
+module.exports = mergeConfig(
+  require('@react-native/fantom/config/metro.config'),
+  {
+    resolver: {
+      extraNodeModules: {'my-library': path.join(__dirname, 'src')},
+    },
+  },
+);
+```
+
+```shell
+FANTOM_METRO_CONFIG_PATH=fantom.metro.config.js yarn fantom <regexForTestFiles>
+```
+
+`yarn fantom-cli` bundles with the same config.
+
 ### Debugging
 
 > [!WARNING] Meta-only: debugging only works on Meta's internal infrastructure
@@ -731,8 +762,9 @@ configuration objects.
 
 The runner then follows these steps:
 
-1. It creates a single "executable" JavaScript file using Metro (with this
-   [configuration](../config/metro.config.js)), containing the test itself, its
+1. It creates a single "executable" JavaScript file using Metro (with
+   [Fantom's configuration](../config/metro.config.js), or the one
+   `FANTOM_METRO_CONFIG_PATH` names), containing the test itself, its
    dependencies and some glue code to run the test at runtime and report its
    results. Depending on the configured "mode" for the test, the runner might
    compile that JavaScript file into Hermes bytecode.

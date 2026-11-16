@@ -15,6 +15,7 @@ import {
   isOSS,
   validateEnvironmentVariables,
 } from '../EnvironmentOptions';
+import loadMetroConfig from '../loadMetroConfig';
 import {getTestBuildOutputPath} from '../paths';
 import build from './build';
 import {
@@ -23,7 +24,6 @@ import {
 } from '@react-native/dev-middleware';
 import * as Metro from 'metro';
 import {Server} from 'node:net';
-import path from 'node:path';
 
 export default async function globalSetup(
   globalConfig: {
@@ -48,10 +48,6 @@ export default async function globalSetup(
 }
 
 async function startMetroServer() {
-  const metroConfig = await Metro.loadConfig({
-    config: path.resolve(__dirname, '..', '..', 'config', 'metro.config.js'),
-  });
-
   if (process.env.__FANTOM_METRO_PORT__ == null) {
     const availablePort = await findAvailablePort();
     process.env.__FANTOM_METRO_PORT__ = String(availablePort);
@@ -59,8 +55,9 @@ async function startMetroServer() {
 
   // We need to reuse the same port across runs because can only set environment
   // variables for workers in the first one.
-  // $FlowExpectedError[cannot-write]
-  metroConfig.server.port = Number(process.env.__FANTOM_METRO_PORT__);
+  const metroConfig = await loadMetroConfig(
+    Number(process.env.__FANTOM_METRO_PORT__),
+  );
 
   const serverBaseUrl = `http://localhost:${metroConfig.server.port}`;
   const devToolLauncher: DevToolLauncher = {

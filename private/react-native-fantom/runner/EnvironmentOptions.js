@@ -8,6 +8,9 @@
  * @format
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 const VALID_ENVIRONMENT_VARIABLES = [
   'FANTOM_DEBUG_CPP',
   'FANTOM_ENABLE_ASAN',
@@ -21,6 +24,7 @@ const VALID_ENVIRONMENT_VARIABLES = [
   'FANTOM_PROFILE_JS',
   'FANTOM_PROFILE_CPP',
   'FANTOM_ENABLE_JS_MEMORY_INSTRUMENTATION',
+  'FANTOM_METRO_CONFIG_PATH',
 ];
 
 /**
@@ -87,6 +91,22 @@ export const enableJSMemoryInstrumentation: boolean = Boolean(
   process.env.FANTOM_ENABLE_JS_MEMORY_INSTRUMENTATION,
 );
 
+const metroConfigPathVariable = process.env.FANTOM_METRO_CONFIG_PATH;
+
+const configuredMetroConfigPath: ?string =
+  metroConfigPathVariable != null && metroConfigPathVariable !== ''
+    ? path.resolve(metroConfigPathVariable)
+    : null;
+
+/**
+ * The Metro config Fantom bundles tests with: the file
+ * `FANTOM_METRO_CONFIG_PATH` names, relative to the repository's root, where
+ * Fantom runs, or Fantom's own.
+ */
+export const metroConfigPath: string =
+  configuredMetroConfigPath ??
+  path.resolve(__dirname, '..', 'config', 'metro.config.js');
+
 /**
  * Throws an error if there is an environment variable defined with the FANTOM_
  * prefix that is not recognized.
@@ -101,6 +121,18 @@ export function validateEnvironmentVariables(): void {
         `Unexpected Fantom environment variable: ${key}=${String(process.env[key])}. Accepted variables are: ${VALID_ENVIRONMENT_VARIABLES.join(', ')}`,
       );
     }
+  }
+
+  if (
+    configuredMetroConfigPath != null &&
+    !(
+      fs.existsSync(configuredMetroConfigPath) &&
+      fs.statSync(configuredMetroConfigPath).isFile()
+    )
+  ) {
+    throw new Error(
+      `FANTOM_METRO_CONFIG_PATH names no file: ${configuredMetroConfigPath}`,
+    );
   }
 
   if (isCI && debugCpp) {

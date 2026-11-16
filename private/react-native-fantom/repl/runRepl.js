@@ -10,7 +10,11 @@
 
 import type {AsyncCommandResult} from '../runner/utils';
 
-import {isCI, isOSS} from '../runner/EnvironmentOptions';
+import {
+  isCI,
+  isOSS,
+  validateEnvironmentVariables,
+} from '../runner/EnvironmentOptions';
 import {run as runTester} from '../runner/executables/tester';
 import getHostPlatform from '../runner/getHostPlatform';
 import {getTestBuildOutputPath} from '../runner/paths';
@@ -128,6 +132,8 @@ function spawnTester(args: ReadonlyArray<string>): AsyncCommandResult {
 
 export default async function runRepl(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+
+  validateEnvironmentVariables();
 
   await startMetroServer();
 
