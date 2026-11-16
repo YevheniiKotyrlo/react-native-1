@@ -14,8 +14,18 @@ import type {
   HermesVariant,
 } from '../utils';
 
-import {debugCpp, isCI, profileCpp} from '../EnvironmentOptions';
-import {CPP_TRACES_OUTPUT_PATH, NATIVE_BUILD_OUTPUT_PATH} from '../paths';
+import {
+  debugCpp,
+  isCI,
+  isOSS,
+  ossTesterPath,
+  profileCpp,
+} from '../EnvironmentOptions';
+import {
+  CPP_TRACES_OUTPUT_PATH,
+  DEFAULT_OSS_TESTER_PATH,
+  NATIVE_BUILD_OUTPUT_PATH,
+} from '../paths';
 import {
   getBuckModesForPlatform,
   getBuckOptionsForHermes,
@@ -38,10 +48,18 @@ type TesterOptions = Readonly<{
   hermesVariant: HermesVariant,
 }>;
 
+export function getOSSFantomTesterPath(): string {
+  return ossTesterPath ?? DEFAULT_OSS_TESTER_PATH;
+}
+
 export function getFantomTesterPath({
   hermesVariant,
   ...options
 }: TesterOptions): string {
+  if (isOSS) {
+    return getOSSFantomTesterPath();
+  }
+
   return path.join(
     NATIVE_BUILD_OUTPUT_PATH,
     `fantom-tester-${(hermesVariant as string).toLowerCase()}-${options.enableOptimized ? 'opt' : 'dev'}${options.enableCoverage ? '-coverage' : ''}`,
@@ -125,6 +143,10 @@ export function run(
   options: TesterOptions,
   env: EnvironmentOverrides,
 ): AsyncCommandResult {
+  if (isOSS) {
+    return runCommand(getOSSFantomTesterPath(), args, env);
+  }
+
   if (!isCI && !debugCpp) {
     build(options, env);
   }

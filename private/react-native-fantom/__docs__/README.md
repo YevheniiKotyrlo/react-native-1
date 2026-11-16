@@ -568,6 +568,16 @@ to build different binary variants at the same time.
 CI environments (`SANDCASTLE`, `GITHUB_ACTIONS`) auto-detect this mode — see
 [`runner/EnvironmentOptions.js`](../runner/EnvironmentOptions.js).
 
+### Running another build of the tester
+
+In OSS, `FANTOM_TESTER_PATH` names the tester to run in place of
+`build/tester/fantom_tester`, such as one built with other CMake options or a
+script that runs it under a tool:
+
+```shell
+FANTOM_TESTER_PATH=/path/to/fantom_tester yarn fantom <regexForTestFiles>
+```
+
 ### FAQ
 
 #### How is this different from Jest tests?

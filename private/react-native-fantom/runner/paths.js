@@ -15,6 +15,14 @@ import path from 'node:path';
 
 export const PROJECT_ROOT: string = path.resolve(__dirname, '..', '..', '..');
 
+export const DEFAULT_OSS_TESTER_PATH: string = path.resolve(
+  __dirname,
+  '..',
+  'build',
+  'tester',
+  'fantom_tester',
+);
+
 export const OUTPUT_PATH: string = path.resolve(__dirname, '..', '.out');
 export const JS_BUILD_OUTPUT_PATH: string = path.join(OUTPUT_PATH, 'js-builds');
 export const NATIVE_BUILD_OUTPUT_PATH: string = path.join(

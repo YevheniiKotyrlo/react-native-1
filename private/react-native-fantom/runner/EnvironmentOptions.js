@@ -8,7 +8,10 @@
  * @format
  */
 
-const VALID_ENVIRONMENT_VARIABLES = [
+import fs from 'node:fs';
+import path from 'node:path';
+
+const VALID_ENVIRONMENT_VARIABLES: ReadonlyArray<string> = [
   'FANTOM_DEBUG_CPP',
   'FANTOM_ENABLE_ASAN',
   'FANTOM_ENABLE_TSAN',
@@ -21,7 +24,12 @@ const VALID_ENVIRONMENT_VARIABLES = [
   'FANTOM_PROFILE_JS',
   'FANTOM_PROFILE_CPP',
   'FANTOM_ENABLE_JS_MEMORY_INSTRUMENTATION',
+  'FANTOM_TESTER_PATH',
 ];
+
+function resolvePath(value: ?string): ?string {
+  return value != null && value !== '' ? path.resolve(value) : null;
+}
 
 /**
  * Prints the output of the Fantom tester to the test output.
@@ -88,8 +96,17 @@ export const enableJSMemoryInstrumentation: boolean = Boolean(
 );
 
 /**
- * Throws an error if there is an environment variable defined with the FANTOM_
- * prefix that is not recognized.
+ * The Fantom tester an OSS run executes, in place of the one
+ * `yarn workspace @react-native/fantom build` makes.
+ */
+export const ossTesterPath: ?string = resolvePath(
+  process.env.FANTOM_TESTER_PATH,
+);
+
+/**
+ * Throws an error for a FANTOM_ environment variable that is not recognized,
+ * for a combination of them this environment does not support, and for a
+ * tester path that names no file.
  */
 export function validateEnvironmentVariables(): void {
   for (const key of Object.keys(process.env)) {
@@ -120,5 +137,15 @@ export function validateEnvironmentVariables(): void {
     throw new Error(
       'Memory instrumentation is not supported in CI or OSS environments, as it requires a custom Hermes build that is not prebuilt in those environments.',
     );
+  }
+
+  if (ossTesterPath != null && !isOSS) {
+    throw new Error(
+      'FANTOM_TESTER_PATH is only used in OSS environments, where Fantom runs a tester built with Gradle.',
+    );
+  }
+
+  if (ossTesterPath != null && !fs.existsSync(ossTesterPath)) {
+    throw new Error(`FANTOM_TESTER_PATH names no file: ${ossTesterPath}`);
   }
 }
