@@ -107,6 +107,10 @@ export function validateEnvironmentVariables(): void {
     throw new Error('Cannot run Fantom with C++ debugging on CI');
   }
 
+  if (isOSS && debugCpp) {
+    throw new Error('Cannot run Fantom with C++ debugging in OSS');
+  }
+
   if (isCI && profileCpp) {
     throw new Error('Cannot run Fantom with C++ profiling on CI');
   }

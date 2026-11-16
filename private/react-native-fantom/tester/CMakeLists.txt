@@ -13,6 +13,12 @@ endif()
 
 project(fantom_tester)
 
+# FANTOM_SANITIZER, address or thread, compiles and links everything below with that sanitizer.
+if(FANTOM_SANITIZER)
+  add_compile_options(-fsanitize=${FANTOM_SANITIZER} -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=${FANTOM_SANITIZER})
+endif()
+
 include_directories(${REACT_ANDROID_DIR}/hermes-engine/build/prefab-headers)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/")

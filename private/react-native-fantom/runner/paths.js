@@ -21,6 +21,11 @@ export const NATIVE_BUILD_OUTPUT_PATH: string = path.join(
   OUTPUT_PATH,
   'native-builds',
 );
+export const GRADLE_BUILD_OUTPUT_PATH: string = path.resolve(
+  __dirname,
+  '..',
+  'build',
+);
 export const JS_TRACES_OUTPUT_PATH: string = path.join(
   OUTPUT_PATH,
   'js-traces',

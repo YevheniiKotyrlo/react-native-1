@@ -10,11 +10,7 @@
 
 import type {DevToolLauncher} from '@react-native/dev-middleware';
 
-import {
-  debugJS,
-  isOSS,
-  validateEnvironmentVariables,
-} from '../EnvironmentOptions';
+import {debugJS, validateEnvironmentVariables} from '../EnvironmentOptions';
 import {getTestBuildOutputPath} from '../paths';
 import build from './build';
 import {
@@ -38,13 +34,11 @@ export default async function globalSetup(
 
   await startMetroServer();
 
-  if (!isOSS) {
-    await build(globalConfig.collectCoverage, {
-      LLVM_PROFILE_FILE: globalConfig.collectCoverage
-        ? getTestBuildOutputPath() + 'fantom.profraw'
-        : undefined,
-    });
-  }
+  await build(globalConfig.collectCoverage, {
+    LLVM_PROFILE_FILE: globalConfig.collectCoverage
+      ? getTestBuildOutputPath() + 'fantom.profraw'
+      : undefined,
+  });
 }
 
 async function startMetroServer() {

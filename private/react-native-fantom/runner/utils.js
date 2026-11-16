@@ -55,6 +55,42 @@ export function getHermesCompilerTarget(variant: HermesVariant): string {
   }
 }
 
+export type Sanitizer = 'asan' | 'tsan';
+
+export type SanitizerSelection = Readonly<{
+  sanitizer: ?Sanitizer,
+  warning: ?string,
+}>;
+
+export function selectSanitizer({
+  enableASAN,
+  enableOptimized,
+  enableTSAN,
+}: Readonly<{
+  enableASAN: boolean,
+  enableOptimized: boolean,
+  enableTSAN: boolean,
+}>): SanitizerSelection {
+  if (enableOptimized) {
+    return {
+      sanitizer: null,
+      warning:
+        enableASAN || enableTSAN
+          ? 'ASAN and TSAN are not supported in release mode. Use dev mode instead.'
+          : null,
+    };
+  }
+  if (enableASAN) {
+    return {
+      sanitizer: 'asan',
+      warning: enableTSAN
+        ? 'ASAN and TSAN modes cannot be used together. Using ASAN mode as a fallback.'
+        : null,
+    };
+  }
+  return {sanitizer: enableTSAN ? 'tsan' : null, warning: null};
+}
+
 export function getBuckModesForPlatform({
   enableCoverage,
   enableOptimized,
@@ -67,30 +103,13 @@ export function getBuckModesForPlatform({
     modes.push('@//xplat/mode/hermes/opt');
   }
 
-  let sanitizer: ?('asan' | 'tsan') = null;
-  if (enableOptimized) {
-    if (EnvironmentOptions.enableASAN || EnvironmentOptions.enableTSAN) {
-      printConsoleLog({
-        type: 'console-log',
-        level: 'warn',
-        message:
-          'ASAN and TSAN are not supported in release mode. Use dev mode instead.',
-      });
-    }
-  } else {
-    if (EnvironmentOptions.enableASAN && EnvironmentOptions.enableTSAN) {
-      printConsoleLog({
-        type: 'console-log',
-        level: 'warn',
-        message:
-          'ASAN and TSAN modes cannot be used together. Using ASAN mode as a fallback.',
-      });
-      sanitizer = 'asan';
-    } else if (EnvironmentOptions.enableASAN) {
-      sanitizer = 'asan';
-    } else if (EnvironmentOptions.enableTSAN) {
-      sanitizer = 'tsan';
-    }
+  const {sanitizer, warning} = selectSanitizer({
+    enableASAN: EnvironmentOptions.enableASAN,
+    enableOptimized,
+    enableTSAN: EnvironmentOptions.enableTSAN,
+  });
+  if (warning != null) {
+    printConsoleLog({type: 'console-log', level: 'warn', message: warning});
   }
 
   switch (os.platform()) {

@@ -59,9 +59,15 @@ val reactAndroidDownloadsDir =
     }
 
 val testerDir = File("$projectDir/tester")
-val testerBuildDir = File("$buildDir/tester")
-val testerBuildOutputFileTree =
-    fileTree(testerBuildDir.toString())
+
+// Each variant builds into a directory of its own, from which runner/executables/tester.js runs it.
+class FantomTesterVariant(val taskSuffix: String, val directory: File, val sanitizer: String?)
+
+val defaultFantomTester = FantomTesterVariant("", File("$buildDir/tester"), null)
+val testerBuildDir = defaultFantomTester.directory
+
+fun testerBuildOutputFileTree(variant: FantomTesterVariant) =
+    fileTree(variant.directory.toString())
         .include("**/*.cmake", "**/*.marks", "**/compiler_depends.ts", "**/Makefile", "**/link.txt")
 
 val createNativeDepsDirectories by
@@ -313,64 +319,84 @@ val prepareAllDependencies by
       dependsOn(prepareRNCodegen, prepareHermesDependencies, prepareNative3pDependencies)
     }
 
-val configureFantomTester by
-    tasks.registering(CustomExecTask::class) {
-      dependsOn(prepareAllDependencies)
-      workingDir(testerDir)
-      inputs.dir(testerDir)
-      outputs.files(testerBuildOutputFileTree)
-      val cmdArgs =
-          mutableListOf(
-              cmakeBinaryPath,
-              // Suppress all warnings as this is the Hermes build and we can't fix them.
-              "--log-level=ERROR",
-              "-S",
-              ".",
-              "-B",
-              testerBuildDir.toString(),
-              "-DCMAKE_BUILD_TYPE=Debug",
-              "-DFANTOM_CODEGEN_DIR=$buildDir/codegen",
-              "-DFANTOM_THIRD_PARTY_DIR=$buildDir/third-party",
-              "-DFANTOM_NINJA=$cmakePath/bin/ninja",
-              "-DREACT_ANDROID_DIR=$reactAndroidDir",
-              "-DREACT_COMMON_DIR=$reactNativeDir/ReactCommon",
-              "-DREACT_CXX_PLATFORM_DIR=$reactNativeDir/ReactCxxPlatform",
-              "-DREACT_THIRD_PARTY_NDK_DIR=$reactAndroidBuildDir/third-party-ndk",
-              "-DRN_ENABLE_DEBUG_STRING_CONVERTIBLE=ON",
-          )
+fun registerFantomTesterTasks(variant: FantomTesterVariant): TaskProvider<CustomExecTask> {
+  val configure =
+      tasks.register<CustomExecTask>("configureFantomTester${variant.taskSuffix}") {
+        dependsOn(prepareAllDependencies)
+        workingDir(testerDir)
+        inputs.dir(testerDir)
+        outputs.files(testerBuildOutputFileTree(variant))
+        val cmdArgs =
+            mutableListOf(
+                cmakeBinaryPath,
+                // Suppress all warnings as this is the Hermes build and we can't fix them.
+                "--log-level=ERROR",
+                "-S",
+                ".",
+                "-B",
+                variant.directory.toString(),
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DFANTOM_CODEGEN_DIR=$buildDir/codegen",
+                "-DFANTOM_THIRD_PARTY_DIR=$buildDir/third-party",
+                "-DFANTOM_NINJA=$cmakePath/bin/ninja",
+                "-DREACT_ANDROID_DIR=$reactAndroidDir",
+                "-DREACT_COMMON_DIR=$reactNativeDir/ReactCommon",
+                "-DREACT_CXX_PLATFORM_DIR=$reactNativeDir/ReactCxxPlatform",
+                "-DREACT_THIRD_PARTY_NDK_DIR=$reactAndroidBuildDir/third-party-ndk",
+                "-DRN_ENABLE_DEBUG_STRING_CONVERTIBLE=ON",
+            )
 
-      cmdArgs.add("-DHERMES_V1_ENABLED=1")
+        cmdArgs.add("-DHERMES_V1_ENABLED=1")
+        if (variant.sanitizer != null) {
+          cmdArgs.add("-DFANTOM_SANITIZER=${variant.sanitizer}")
+        }
 
-      commandLine(cmdArgs)
-      standardOutputFile.set(project.file("$buildDir/reports/configure-fantom_tester.log"))
-      errorOutputFile.set(project.file("$buildDir/reports/configure-fantom_tester.error.log"))
-    }
+        commandLine(cmdArgs)
+        standardOutputFile.set(
+            project.file("$buildDir/reports/configure-fantom_${variant.directory.name}.log")
+        )
+        errorOutputFile.set(
+            project.file("$buildDir/reports/configure-fantom_${variant.directory.name}.error.log")
+        )
+      }
 
-val buildFantomTester by
-    tasks.registering(CustomExecTask::class) {
-      dependsOn(configureFantomTester)
-      workingDir(testerDir)
-      inputs.dir(testerDir)
-      inputs.files(testerBuildOutputFileTree)
-      outputs.upToDateWhen { false }
-      commandLine(
-          cmakeBinaryPath,
-          "--build",
-          testerBuildDir.toString(),
-          "--target",
-          "fantom_tester",
-          "-j",
-          ndkBuildJobs,
-      )
-      standardOutputFile.set(project.file("$buildDir/reports/build-fantom_tester.log"))
-      errorOutputFile.set(project.file("$buildDir/reports/build-fantom_tester.error.log"))
-    }
+  tasks.register<CustomExecTask>("buildFantomTester${variant.taskSuffix}") {
+    dependsOn(configure)
+    workingDir(testerDir)
+    inputs.dir(testerDir)
+    inputs.files(testerBuildOutputFileTree(variant))
+    outputs.upToDateWhen { false }
+    commandLine(
+        cmakeBinaryPath,
+        "--build",
+        variant.directory.toString(),
+        "--target",
+        "fantom_tester",
+        "-j",
+        ndkBuildJobs,
+    )
+    standardOutputFile.set(
+        project.file("$buildDir/reports/build-fantom_${variant.directory.name}.log")
+    )
+    errorOutputFile.set(
+        project.file("$buildDir/reports/build-fantom_${variant.directory.name}.error.log")
+    )
+  }
+
+  return configure
+}
+
+val configureFantomTester = registerFantomTesterTasks(defaultFantomTester)
+
+registerFantomTesterTasks(FantomTesterVariant("Asan", File("$buildDir/tester-asan"), "address"))
+
+registerFantomTesterTasks(FantomTesterVariant("Tsan", File("$buildDir/tester-tsan"), "thread"))
 
 val buildReactCommonTests by
     tasks.registering(CustomExecTask::class) {
       dependsOn(configureFantomTester)
       workingDir(testerDir)
-      inputs.files(testerBuildOutputFileTree)
+      inputs.files(testerBuildOutputFileTree(defaultFantomTester))
       outputs.upToDateWhen { false }
       commandLine(
           cmakeBinaryPath,

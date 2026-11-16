@@ -469,6 +469,10 @@ For thread sanitizer, correspondingly, use flag `FANTOM_ENABLE_TSAN`:
 FANTOM_ENABLE_TSAN=1 yarn fantom <regexForTestFiles>
 ```
 
+Outside Meta's infrastructure, Gradle builds the tester with that sanitizer into
+a directory of its own, `private/react-native-fantom/build/tester-asan` or
+`build/tester-tsan`, the first time a run needs it.
+
 ### Profiling
 
 #### JS sampling profiler

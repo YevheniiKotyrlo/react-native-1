@@ -12,19 +12,35 @@ import type {
   AsyncCommandResult,
   EnvironmentOverrides,
   HermesVariant,
+  Sanitizer,
 } from '../utils';
 
-import {debugCpp, isCI, profileCpp} from '../EnvironmentOptions';
-import {CPP_TRACES_OUTPUT_PATH, NATIVE_BUILD_OUTPUT_PATH} from '../paths';
+import {
+  debugCpp,
+  enableASAN,
+  enableTSAN,
+  isCI,
+  isOSS,
+  profileCpp,
+} from '../EnvironmentOptions';
+import {
+  CPP_TRACES_OUTPUT_PATH,
+  GRADLE_BUILD_OUTPUT_PATH,
+  NATIVE_BUILD_OUTPUT_PATH,
+  PROJECT_ROOT,
+} from '../paths';
 import {
   getBuckModesForPlatform,
   getBuckOptionsForHermes,
   getDebugInfoFromCommandResult,
+  printConsoleLog,
   runBuck2,
   runBuck2Sync,
   runCommand,
   runCommandSync,
+  selectSanitizer,
 } from '../utils';
+import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,17 +54,84 @@ type TesterOptions = Readonly<{
   hermesVariant: HermesVariant,
 }>;
 
+type GradleTesterVariant = 'dev' | Sanitizer;
+
+type GradleTesterBuild = Readonly<{directory: string, task: string}>;
+
+// build.gradle.kts registers these tasks, each building its variant into its directory.
+const GRADLE_TESTER_BUILDS: Readonly<{
+  dev: GradleTesterBuild,
+  asan: GradleTesterBuild,
+  tsan: GradleTesterBuild,
+}> = {
+  dev: {directory: 'tester', task: 'buildFantomTester'},
+  asan: {directory: 'tester-asan', task: 'buildFantomTesterAsan'},
+  tsan: {directory: 'tester-tsan', task: 'buildFantomTesterTsan'},
+};
+
+function selectGradleTester(enableOptimized: boolean): Readonly<{
+  variant: GradleTesterVariant,
+  warning: ?string,
+}> {
+  const {sanitizer, warning} = selectSanitizer({
+    enableASAN,
+    enableOptimized,
+    enableTSAN,
+  });
+  return {variant: sanitizer ?? 'dev', warning};
+}
+
+export function getGradleTesterPath(variant: GradleTesterVariant): string {
+  return path.join(
+    GRADLE_BUILD_OUTPUT_PATH,
+    GRADLE_TESTER_BUILDS[variant].directory,
+    'fantom_tester',
+  );
+}
+
 export function getFantomTesterPath({
   hermesVariant,
   ...options
 }: TesterOptions): string {
+  if (isOSS) {
+    return getGradleTesterPath(
+      selectGradleTester(options.enableOptimized).variant,
+    );
+  }
   return path.join(
     NATIVE_BUILD_OUTPUT_PATH,
     `fantom-tester-${(hermesVariant as string).toLowerCase()}-${options.enableOptimized ? 'opt' : 'dev'}${options.enableCoverage ? '-coverage' : ''}`,
   );
 }
 
+function buildWithGradle(options: TesterOptions): void {
+  const {variant, warning} = selectGradleTester(options.enableOptimized);
+  if (fs.existsSync(getGradleTesterPath(variant))) {
+    return;
+  }
+  if (warning != null) {
+    printConsoleLog({type: 'console-log', level: 'warn', message: warning});
+  }
+
+  const task = `:private:react-native-fantom:${GRADLE_TESTER_BUILDS[variant].task}`;
+  const result = spawnSync(path.join(PROJECT_ROOT, 'gradlew'), [task], {
+    cwd: PROJECT_ROOT,
+    stdio: 'inherit',
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `Building the Fantom tester with \`./gradlew ${task}\` failed`,
+      {cause: result.error},
+    );
+  }
+}
+
 export function build(options: TesterOptions, env: EnvironmentOverrides): void {
+  if (isOSS) {
+    buildWithGradle(options);
+    return;
+  }
+
   const destPath = getFantomTesterPath(options);
   if (fs.existsSync(destPath)) {
     return;
