@@ -63,6 +63,7 @@ afterEach(() => {
 type RegisteredGradleTesterVariant = Readonly<{
   directory: string,
   task: string,
+  buildType: string,
   sanitizer: ?string,
 }>;
 
@@ -76,13 +77,14 @@ function registeredGradleTesterVariants(): Readonly<{
   return Object.fromEntries(
     Array.from(
       buildScript.matchAll(
-        /FantomTesterVariant\(\s*"(\w*)",\s*File\("\$buildDir\/([\w-]+)"\),\s*(?:null|"(\w+)")\s*\)/g,
+        /FantomTesterVariant\(\s*"(\w*)",\s*File\("\$buildDir\/([\w-]+)"\),\s*"(\w+)",\s*(?:null|"(\w+)")\s*,?\s*\)/g,
       ),
-      ([, taskSuffix, directory, sanitizer]) => [
+      ([, taskSuffix, directory, buildType, sanitizer]) => [
         taskSuffix === '' ? 'dev' : taskSuffix.toLowerCase(),
         {
           directory,
           task: `buildFantomTester${taskSuffix}`,
+          buildType,
           sanitizer: sanitizer ?? null,
         },
       ],
@@ -132,6 +134,59 @@ describe('getGradleTesterPath', () => {
       path.join(GRADLE_BUILD_DIRECTORY, 'tester-tsan', 'fantom_tester'),
     );
   });
+
+  it('runs the optimized tester from its own directory', () => {
+    expect(getGradleTesterPath('opt')).toBe(
+      path.join(GRADLE_BUILD_DIRECTORY, 'tester-opt', 'fantom_tester'),
+    );
+  });
+});
+
+describe('selectGradleTester', () => {
+  it('runs the dev tester, or the sanitizer the environment enables', () => {
+    expect(
+      selectGradleTester({
+        enableASAN: false,
+        enableOptimized: false,
+        enableTSAN: false,
+      }).variant,
+    ).toBe('dev');
+    expect(
+      selectGradleTester({
+        enableASAN: true,
+        enableOptimized: false,
+        enableTSAN: false,
+      }).variant,
+    ).toBe('asan');
+    expect(
+      selectGradleTester({
+        enableASAN: false,
+        enableOptimized: false,
+        enableTSAN: true,
+      }).variant,
+    ).toBe('tsan');
+  });
+
+  it('runs an optimized test on the optimized tester, warning of a sanitizer it leaves out', () => {
+    expect(
+      selectGradleTester({
+        enableASAN: false,
+        enableOptimized: true,
+        enableTSAN: false,
+      }),
+    ).toEqual({variant: 'opt', warning: null});
+    expect(
+      selectGradleTester({
+        enableASAN: true,
+        enableOptimized: true,
+        enableTSAN: false,
+      }),
+    ).toEqual({
+      variant: 'opt',
+      warning:
+        'ASAN and TSAN are not supported in release mode. Use dev mode instead.',
+    });
+  });
 });
 
 describe('GRADLE_TESTER_BUILDS', () => {
@@ -145,40 +200,35 @@ describe('GRADLE_TESTER_BUILDS', () => {
     );
   });
 
-  it('builds each sanitizer variant with the sanitizer it is named for', () => {
+  it('builds each variant with the build type and sanitizer it is named for', () => {
     expect(
       Object.fromEntries(
         Object.entries(registeredGradleTesterVariants()).map(
-          ([variant, {sanitizer}]) => [variant, sanitizer],
+          ([variant, {buildType, sanitizer}]) => [
+            variant,
+            {buildType, sanitizer},
+          ],
         ),
       ),
-    ).toEqual({dev: null, asan: 'address', tsan: 'thread'});
-  });
-});
-
-describe('selectGradleTester', () => {
-  it('runs a dev config on the tester of the sanitizer it enables', () => {
-    expect(
-      selectGradleTester({
-        enableASAN: false,
-        enableOptimized: false,
-        enableTSAN: true,
-      }),
-    ).toEqual({variant: 'tsan', warning: null});
-  });
-
-  it('runs a dev config on the dev tester when no sanitizer is enabled', () => {
-    expect(
-      selectGradleTester({
-        enableASAN: false,
-        enableOptimized: false,
-        enableTSAN: false,
-      }),
-    ).toEqual({variant: 'dev', warning: null});
+    ).toEqual({
+      dev: {buildType: 'Debug', sanitizer: null},
+      opt: {buildType: 'RelWithDebInfo', sanitizer: null},
+      asan: {buildType: 'Debug', sanitizer: 'address'},
+      tsan: {buildType: 'Debug', sanitizer: 'thread'},
+    });
   });
 });
 
 describe('selectGradleTesterForRun', () => {
+  it('runs an optimized config on the optimized tester, warning of the sanitizer FANTOM_ENABLE_TSAN enables', () => {
+    replaceFantomEnvironment({FANTOM_ENABLE_TSAN: '1'});
+    expect(require('../tester').selectGradleTesterForRun(true)).toEqual({
+      variant: 'opt',
+      warning:
+        'ASAN and TSAN are not supported in release mode. Use dev mode instead.',
+    });
+  });
+
   it('runs a dev config on the tester FANTOM_ENABLE_ASAN builds', () => {
     replaceFantomEnvironment({FANTOM_ENABLE_ASAN: '1'});
     expect(require('../tester').selectGradleTesterForRun(false)).toEqual({

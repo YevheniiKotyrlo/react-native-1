@@ -36,6 +36,7 @@ import * as EnvironmentOptions from './EnvironmentOptions';
 import {run as runHermesCompiler} from './executables/hermesc';
 import {
   getFantomTesterPath,
+  isBuilt as isFantomTesterBuilt,
   run as runFantomTester,
 } from './executables/tester';
 import formatFantomConfig from './formatFantomConfig';
@@ -297,16 +298,6 @@ module.exports = async function runTest(
   ];
 
   for (const testConfig of testConfigs) {
-    if (EnvironmentOptions.isOSS && testConfig.isNativeOptimized) {
-      testResultsByConfig.push(
-        skippedTestResults({
-          ancestorTitles: ['"@fantom_mode opt" in docblock'],
-          title: 'Optimized mode is not yet supported in OSS',
-        }),
-      );
-      continue;
-    }
-
     if (
       EnvironmentOptions.isOSS &&
       testConfig.hermesVariant !== HermesVariantEnum.Hermes
@@ -322,11 +313,28 @@ module.exports = async function runTest(
       continue;
     }
 
-    if (EnvironmentOptions.isOSS && testConfig.isJsBytecode) {
+    const collectCoverage = shouldCollectCoverage(
+      testPath,
+      testContents,
+      globalConfig,
+    );
+
+    const rnTesterOptions = {
+      enableOptimized: testConfig.isNativeOptimized,
+      hermesVariant: testConfig.hermesVariant,
+      enableCoverage: collectCoverage,
+    };
+
+    if (
+      !EnvironmentOptions.isCI &&
+      testConfig.isNativeOptimized &&
+      !isFantomTesterBuilt(rnTesterOptions)
+    ) {
       testResultsByConfig.push(
         skippedTestResults({
-          ancestorTitles: ['"@fantom_mode dev" in docblock'],
-          title: 'Hermes bytecode is not yet supported in OSS',
+          ancestorTitles: ['"@fantom_mode opt" in docblock'],
+          title:
+            'The optimized tester is not built: `yarn workspace @react-native/fantom build` builds it',
         }),
       );
       continue;
@@ -383,12 +391,6 @@ module.exports = async function runTest(
       path.basename(testJSBundlePath, '.js') + '.map',
     );
 
-    const collectCoverage = shouldCollectCoverage(
-      testPath,
-      testContents,
-      globalConfig,
-    );
-
     const bundleOptions = {
       testPath,
       entry: entrypointPath,
@@ -437,11 +439,6 @@ module.exports = async function runTest(
       LLVM_PROFILE_FILE: collectCoverage ? testCoveragePath : undefined,
     };
 
-    const rnTesterOptions = {
-      enableOptimized: testConfig.isNativeOptimized,
-      hermesVariant: testConfig.hermesVariant,
-      enableCoverage: collectCoverage,
-    };
     const rnTesterCommandResult = runFantomTester(
       rnTesterCommandArgs,
       rnTesterOptions,

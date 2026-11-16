@@ -10,8 +10,8 @@
 
 import type {HermesVariant, SyncCommandResult} from '../utils';
 
-import {isCI} from '../EnvironmentOptions';
-import {NATIVE_BUILD_OUTPUT_PATH} from '../paths';
+import {isCI, isOSS} from '../EnvironmentOptions';
+import {GRADLE_HERMES_COMPILER_PATH, NATIVE_BUILD_OUTPUT_PATH} from '../paths';
 import {
   getBuckModesForPlatform,
   getBuckOptionsForHermes,
@@ -34,12 +34,24 @@ function getHermesCompilerPath({
   enableOptimized,
   hermesVariant,
 }: HermescOptions): string {
+  if (isOSS) {
+    return GRADLE_HERMES_COMPILER_PATH;
+  }
   return path.join(
     NATIVE_BUILD_OUTPUT_PATH,
     `hermesc-${(hermesVariant as string).toLowerCase()}-${enableOptimized ? 'opt' : 'dev'}`,
   );
 }
 export function build(options: HermescOptions): void {
+  if (isOSS) {
+    if (!fs.existsSync(GRADLE_HERMES_COMPILER_PATH)) {
+      throw new Error(
+        `Fantom's tester build has not built hermesc at ${GRADLE_HERMES_COMPILER_PATH}`,
+      );
+    }
+    return;
+  }
+
   const destPath = getHermesCompilerPath(options);
   if (fs.existsSync(destPath)) {
     return;
@@ -112,7 +124,7 @@ export function run(
   args: ReadonlyArray<string>,
   options: HermescOptions,
 ): SyncCommandResult {
-  if (!isCI) {
+  if (!isCI || isOSS) {
     build(options);
   }
 

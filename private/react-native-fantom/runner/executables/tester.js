@@ -55,16 +55,18 @@ type TesterOptions = Readonly<{
   hermesVariant: HermesVariant,
 }>;
 
-type GradleTesterVariant = 'dev' | Sanitizer;
+type GradleTesterVariant = 'dev' | 'opt' | Sanitizer;
 
 type GradleTesterBuild = Readonly<{directory: string, task: string}>;
 
 export const GRADLE_TESTER_BUILDS: Readonly<{
   dev: GradleTesterBuild,
+  opt: GradleTesterBuild,
   asan: GradleTesterBuild,
   tsan: GradleTesterBuild,
 }> = {
   dev: {directory: 'tester', task: 'buildFantomTester'},
+  opt: {directory: 'tester-opt', task: 'buildFantomTesterOpt'},
   asan: {directory: 'tester-asan', task: 'buildFantomTesterAsan'},
   tsan: {directory: 'tester-tsan', task: 'buildFantomTesterTsan'},
 };
@@ -80,7 +82,10 @@ export function selectGradleTester(
   warning: ?string,
 }> {
   const {sanitizer, warning} = selectSanitizer(options);
-  return {variant: sanitizer ?? 'dev', warning};
+  return {
+    variant: options.enableOptimized ? 'opt' : (sanitizer ?? 'dev'),
+    warning,
+  };
 }
 
 export function selectGradleTesterForRun(
@@ -133,6 +138,10 @@ function buildWithGradle(variant: GradleTesterVariant): void {
       {cause: result.error},
     );
   }
+}
+
+export function isBuilt(options: TesterOptions): boolean {
+  return !isOSS || fs.existsSync(getFantomTesterPath(options));
 }
 
 export function build(options: TesterOptions, env: EnvironmentOverrides): void {

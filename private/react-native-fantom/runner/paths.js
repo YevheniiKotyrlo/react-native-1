@@ -26,6 +26,18 @@ export const GRADLE_BUILD_OUTPUT_PATH: string = path.resolve(
   '..',
   'build',
 );
+// Gradle's tester tasks build hermesc beside the Hermes library the tester links.
+export const GRADLE_HERMES_COMPILER_PATH: string = path.join(
+  PROJECT_ROOT,
+  'packages',
+  'react-native',
+  'ReactAndroid',
+  'hermes-engine',
+  'build',
+  'hermes',
+  'bin',
+  'hermesc',
+);
 export const JS_TRACES_OUTPUT_PATH: string = path.join(
   OUTPUT_PATH,
   'js-traces',
