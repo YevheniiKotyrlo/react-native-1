@@ -34,6 +34,10 @@ yarn build-types [--validate]
 
 # Build types without API snapshot
 yarn build-types --skip-snapshot
+
+# Build the generated types of Fantom, which are not published, into
+# private/react-native-fantom/types_generated/
+yarn build-types --fantom
 ```
 
 #### Diff API snapshot compatibility

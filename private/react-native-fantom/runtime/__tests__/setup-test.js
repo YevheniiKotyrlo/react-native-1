@@ -75,6 +75,13 @@ function results() {
   return report?.testResults ?? [];
 }
 
+it('restores every global the runtime installs', () => {
+  const {testGlobals} = require('../setup');
+  jestExpect([...Object.keys(testGlobals), '$$RunTests$$'].sort()).toEqual(
+    [...globalNames].sort(),
+  );
+});
+
 it('runs teardown after a failed test before running the next test', () => {
   const {registerTest} = require('../setup');
   const events = [];

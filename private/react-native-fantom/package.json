@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "main": "src/index.js",
+  "types": "types_generated/src/index.d.ts",
   "description": "Internal integration testing and benchmarking tool for React Native",
   "scripts": {
     "build": "./build.sh"

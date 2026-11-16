@@ -129,6 +129,7 @@
     "third-party-podspecs",
     "types_DEPRECATED",
     "types_generated",
+    "!types_generated/src/private/testing",
     "!**/__docs__/**",
     "!**/__fixtures__/**",
     "!**/__flowtests__/**",

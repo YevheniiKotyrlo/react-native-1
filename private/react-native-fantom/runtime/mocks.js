@@ -10,12 +10,30 @@
 
 export const MOCK_FN_TAG: symbol = Symbol('mock function');
 
+export type MockFunctionResult<TReturn> =
+  | Readonly<{isThrow: false, value: TReturn}>
+  | Readonly<{isThrow: true, value: unknown}>;
+
+export type MockFunctionState<TArgs extends Array<unknown>, TReturn> = {
+  readonly calls: Array<TArgs>,
+  lastCall?: TArgs,
+  readonly instances: Array<unknown>,
+  readonly contexts: Array<unknown>,
+  readonly results: Array<MockFunctionResult<TReturn>>,
+};
+
+export type MockFunction<TArgs extends Array<unknown>, TReturn> = {
+  (...args: TArgs): TReturn,
+  readonly mock: MockFunctionState<TArgs, TReturn>,
+  ...
+};
+
 // The type is defined this way because if we get a mixed value, we return
 // a generic mock function, and if we get a typed function, we get a typed mock.
 export const ensureMockFunction: (<TArgs extends Array<unknown>, TReturn>(
   fn: (...rest: TArgs) => TReturn,
-) => JestMockFn<TArgs, TReturn>) &
-  ((fn: unknown) => JestMockFn<Array<unknown>, unknown>) = fn => {
+) => MockFunction<TArgs, TReturn>) &
+  ((fn: unknown) => MockFunction<Array<unknown>, unknown>) = fn => {
   // $FlowExpectedError[invalid-computed-prop]
   // $FlowExpectedError[incompatible-use]
   if (typeof fn !== 'function' || !fn[MOCK_FN_TAG]) {
@@ -29,54 +47,51 @@ export const ensureMockFunction: (<TArgs extends Array<unknown>, TReturn>(
   return fn;
 };
 
+declare export function createMockFunction(): MockFunction<
+  Array<unknown>,
+  void,
+>;
+declare export function createMockFunction<
+  TArgs extends Array<unknown>,
+  TReturn,
+>(
+  implementation: (...rest: TArgs) => TReturn,
+): MockFunction<TArgs, TReturn>;
 export function createMockFunction<TArgs extends Array<unknown>, TReturn>(
-  initialImplementation?: (...rest: TArgs) => TReturn,
-): JestMockFn<TArgs, TReturn> {
-  let implementation: ?(...rest: TArgs) => TReturn = initialImplementation;
-
-  const mock: JestMockFn<TArgs, TReturn>['mock'] = {
+  implementation?: (...rest: TArgs) => TReturn,
+): MockFunction<TArgs, TReturn | void> {
+  const mock: MockFunctionState<TArgs, TReturn | void> = {
     calls: [],
-    // $FlowExpectedError[incompatible-type]
     lastCall: undefined,
     instances: [],
     contexts: [],
     results: [],
   };
 
-  const mockFunction = function (this: unknown, ...args: TArgs): TReturn {
-    let result: JestMockFn<TArgs, TReturn>['mock']['results'][number] = {
-      isThrow: false,
-      // $FlowExpectedError[incompatible-type]
-      value: undefined,
-    };
-
-    if (implementation != null) {
-      try {
-        result.value = implementation.apply(this, args);
-      } catch (error) {
-        result.isThrow = true;
-        result.value = error;
-      }
-    }
-
+  function mockFunction(this: unknown, ...args: TArgs): TReturn | void {
     mock.calls.push(args);
     mock.lastCall = args;
-    // $FlowExpectedError[incompatible-type]
     mock.instances.push(new.target ? this : undefined);
     mock.contexts.push(this);
-    mock.results.push(result);
 
-    if (result.isThrow) {
-      throw result.value;
+    if (implementation == null) {
+      mock.results.push({isThrow: false, value: undefined});
+      return undefined;
     }
 
-    return result.value;
-  };
+    try {
+      const value = implementation.apply(this, args);
+      mock.results.push({isThrow: false, value});
+      return value;
+    } catch (error) {
+      mock.results.push({isThrow: true, value: error});
+      throw error;
+    }
+  }
 
   mockFunction.mock = mock;
   // $FlowExpectedError[invalid-computed-prop]
   mockFunction[MOCK_FN_TAG] = true;
 
-  // $FlowExpectedError[incompatible-type]
   return mockFunction;
 }

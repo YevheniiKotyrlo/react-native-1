@@ -8,6 +8,8 @@
  * @format
  */
 
+import type {MockFunctionState} from './mocks';
+
 import {ensureMockFunction} from './mocks';
 import {ScreenshotSnapshotError, snapshotContext} from './snapshotContext';
 import deepEqual from 'deep-equal';
@@ -141,7 +143,7 @@ class Expect {
     }
   }
 
-  toBeInstanceOf(expected: Class<unknown>): void {
+  toBeInstanceOf<T>(expected: Class<T>): void {
     const pass = this.#received instanceof expected;
     if (!this.#isExpectedResult(pass)) {
       throw new ErrorWithCustomBlame(
@@ -590,7 +592,7 @@ class Expect {
     return this.#isNot ? ' not' : '';
   }
 
-  #requireMock(): JestMockFn<Array<unknown>, unknown>['mock'] {
+  #requireMock(): MockFunctionState<Array<unknown>, unknown> {
     try {
       return ensureMockFunction(this.#received).mock;
     } catch (error) {

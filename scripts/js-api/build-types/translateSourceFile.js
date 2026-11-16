@@ -35,6 +35,7 @@ const postTransforms = (filePath: string): Array<PluginObj<unknown>> => [
   require('./transforms/typescript/ensureUndefinedOnOptionalMembers'),
   require('./transforms/typescript/replaceProtectedConstructors'),
   require('./transforms/typescript/replaceDefaultExportName')(filePath),
+  require('./transforms/typescript/rewriteImportsAcrossPackages')(filePath),
 ];
 const prettierOptions = {parser: 'babel'};
 const unsupportedFeatureRegex =

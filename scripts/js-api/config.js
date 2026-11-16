@@ -15,6 +15,15 @@
 const ENTRY_POINT = 'packages/react-native/index.js.flow';
 
 /**
+ * The entry points for Fantom's generated types, which are not published: its
+ * public API and the globals its runtime gives tests.
+ */
+const FANTOM_ENTRY_POINTS /*: ReadonlyArray<string> */ = [
+  'private/react-native-fantom/src/index.js',
+  'private/react-native-fantom/runtime/setup.js',
+];
+
+/**
  * Ignore patterns for source files that should not be considered for
  * translation.
  */
@@ -37,6 +46,7 @@ const API_EXTRACTOR_CONFIG_FILE = 'api-extractor.json';
 module.exports = {
   API_EXTRACTOR_CONFIG_FILE,
   ENTRY_POINT,
+  FANTOM_ENTRY_POINTS,
   IGNORE_PATTERNS,
   TYPES_OUTPUT_DIR,
 };

@@ -17,7 +17,7 @@ export type FantomRuntimeConstants = Readonly<{
   fantomConfigSummary: string,
   jsHeapSnapshotOutputPathTemplate: string,
   jsHeapSnapshotOutputPathTemplateToken: string,
-  jsTraceOutputPath: ?string,
+  jsTraceOutputPath: string | null,
   hostPlatform: HostPlatform,
 }>;
 

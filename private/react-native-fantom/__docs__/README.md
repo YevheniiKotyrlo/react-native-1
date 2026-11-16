@@ -421,6 +421,17 @@ With an output such as:
     [...]
 ```
 
+### TypeScript
+
+`yarn build-types --fantom`, after `yarn build-types`, generates TypeScript
+declarations for Fantom's API and for the globals its runtime gives tests
+(`describe`, `it`, `test`, `expect`, `jest.fn` and the hooks) into
+`types_generated/`. TypeScript code gets the API from `@react-native/fantom` and
+the globals, with the `rn-*` elements of Fantom's rendered output, from
+[`types/globals.d.ts`](../types/globals.d.ts), which its `tsconfig.json`
+includes, as [`__typetests__`](../__typetests__) does. That `tsconfig.json` sets
+`"types": []`, since Jest's own types declare the same globals differently.
+
 ### Debugging
 
 > [!WARNING] Meta-only: debugging only works on Meta's internal infrastructure

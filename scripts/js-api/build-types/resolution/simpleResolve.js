@@ -10,6 +10,7 @@
 
 const {
   PACKAGES_DIR,
+  PRIVATE_DIR,
   REACT_NATIVE_PACKAGE_DIR,
 } = require('../../../shared/consts');
 const {getPackages} = require('../../../shared/monorepoUtils');
@@ -64,7 +65,10 @@ async function simpleResolve(
   if (importPath.startsWith('.')) {
     const resolvedPath = path.resolve(path.dirname(filePath), importPath);
 
-    if (resolvedPath.startsWith(PACKAGES_DIR)) {
+    if (
+      resolvedPath.startsWith(PACKAGES_DIR) ||
+      resolvedPath.startsWith(PRIVATE_DIR)
+    ) {
       if (resolvedPath.endsWith('.js') || resolvedPath.endsWith('.js.flow')) {
         return resolvedPath;
       }

@@ -21,6 +21,7 @@ declare module 'typescript' {
   declare type SourceFile = Readonly<{
     fileName: string,
     text: string,
+    isDeclarationFile: boolean,
     ...
   }>;
 
@@ -38,7 +39,34 @@ declare module 'typescript' {
 
   declare type Program = Readonly<{
     emit: () => EmitResult,
+    getSourceFiles: () => ReadonlyArray<SourceFile>,
+    getSyntacticDiagnostics: (
+      sourceFile?: SourceFile,
+    ) => ReadonlyArray<Diagnostic>,
+    getSemanticDiagnostics: (
+      sourceFile?: SourceFile,
+    ) => ReadonlyArray<Diagnostic>,
     ...
+  }>;
+
+  declare type System = Readonly<{
+    readFile: (path: string, encoding?: string) => string | void,
+    getCurrentDirectory: () => string,
+    newLine: string,
+    ...
+  }>;
+
+  declare type ParsedCommandLine = Readonly<{
+    fileNames: ReadonlyArray<string>,
+    options: Readonly<{[option: string]: unknown}>,
+    errors: ReadonlyArray<Diagnostic>,
+    ...
+  }>;
+
+  declare type FormatDiagnosticsHost = Readonly<{
+    getCanonicalFileName: (fileName: string) => string,
+    getCurrentDirectory: () => string,
+    getNewLine: () => string,
   }>;
 
   declare type TypeScriptAPI = {
@@ -54,6 +82,20 @@ declare module 'typescript' {
       configFileName?: string,
     ): {options: Object, errors: Diagnostic[]},
     ModuleResolutionKind: typeof ModuleResolutionKind,
+    sys: System,
+    readConfigFile(
+      fileName: string,
+      readFile: (path: string) => string | void,
+    ): Readonly<{config?: unknown, error?: Diagnostic}>,
+    parseJsonConfigFileContent(
+      json: unknown,
+      host: System,
+      basePath: string,
+    ): ParsedCommandLine,
+    formatDiagnosticsWithColorAndContext(
+      diagnostics: ReadonlyArray<Diagnostic>,
+      host: FormatDiagnosticsHost,
+    ): string,
     ...
   };
 

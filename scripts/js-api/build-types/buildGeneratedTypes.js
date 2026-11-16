@@ -9,27 +9,33 @@
  */
 
 const {PACKAGES_DIR, REPO_ROOT} = require('../../shared/consts');
-const {ENTRY_POINT, IGNORE_PATTERNS, TYPES_OUTPUT_DIR} = require('../config');
+const {IGNORE_PATTERNS, TYPES_OUTPUT_DIR} = require('../config');
 const getRequireStack = require('./resolution/getRequireStack');
 const translatedModuleTemplate = require('./templates/translatedModule.d.ts-template');
 const translateSourceFile = require('./translateSourceFile');
+const {getBuildPath, getPackageDir} = require('./utils/getBuildPath');
 const micromatch = require('micromatch');
 const {promises: fs, watch: fsWatch} = require('node:fs');
 const path = require('node:path');
 const {styleText} = require('node:util');
 
 /**
- * Build generated TypeScript types for react-native.
+ * Build generated TypeScript types from the given entry points: react-native's,
+ * which are published to npm, or Fantom's, which are not.
  *
- * Bundles the react-native package and its type dependencies into an output
- * directory of TypeScript definition files which will be published to npm.
+ * Bundles the entry points and their type dependencies into an output
+ * directory of TypeScript definition files in each package they belong to.
  *
  * We translate Flow source code to TypeScript using
  * [flow-api-translator](https://www.npmjs.com/package/flow-api-translator)
  * along with our own pre and post-processing.
  */
-async function buildGeneratedTypes(): Promise<Set<string>> {
-  const files = new Set<string>([path.join(REPO_ROOT, ENTRY_POINT)]);
+async function buildGeneratedTypes(
+  entryPoints: ReadonlyArray<string>,
+): Promise<Set<string>> {
+  const files = new Set<string>(
+    entryPoints.map(entryPoint => path.join(REPO_ROOT, entryPoint)),
+  );
   const translatedFiles = new Set<string>();
   const dependencyEdges: DependencyEdges = [];
   const allErrors: Array<ModuleTranslationError> = [];
@@ -72,8 +78,7 @@ async function buildGeneratedTypes(): Promise<Set<string>> {
 
   const touchedPackages = new Set<string>(
     Array.from(translatedFiles).map(
-      file =>
-        path.join(PACKAGES_DIR, getPackageName(file), TYPES_OUTPUT_DIR) + '/',
+      file => path.join(getPackageDir(file), TYPES_OUTPUT_DIR) + '/',
     ),
   );
   for (const packagePath of touchedPackages) {
@@ -117,11 +122,7 @@ async function translateSourceFiles(
         await fs.mkdir(path.dirname(buildPath), {recursive: true});
         await fs.writeFile(
           buildPath,
-          translatedModuleTemplate({
-            originalFileName: path.relative(REPO_ROOT, file),
-            source: stripDocblock(typescriptDef),
-            tripleSlashDirectives: extractTripleSlashDirectives(source),
-          }),
+          generatedModuleSource(file, source, typescriptDef),
         );
       } catch (e) {
         const error = new ModuleTranslationError(file, e);
@@ -135,20 +136,16 @@ async function translateSourceFiles(
   return {dependencies, errors};
 }
 
-function getPackageName(file: string): string {
-  return path.relative(PACKAGES_DIR, file).split(path.sep)[0];
-}
-
-function getBuildPath(file: string): string {
-  const packageDir = path.join(PACKAGES_DIR, getPackageName(file));
-
-  return path.join(
-    packageDir,
-    file
-      .replace(packageDir, TYPES_OUTPUT_DIR)
-      .replace(/\.js\.flow$/, '.js')
-      .replace(/\.js$/, '.d.ts'),
-  );
+function generatedModuleSource(
+  file: string,
+  source: string,
+  typescriptDef: string,
+): string {
+  return translatedModuleTemplate({
+    originalFileName: path.relative(REPO_ROOT, file),
+    source: stripDocblock(typescriptDef),
+    tripleSlashDirectives: extractTripleSlashDirectives(source),
+  });
 }
 
 function stripDocblock(source: string): string {
@@ -200,11 +197,7 @@ async function translateFile(file: string): Promise<void> {
   await fs.mkdir(path.dirname(buildPath), {recursive: true});
   await fs.writeFile(
     buildPath,
-    translatedModuleTemplate({
-      originalFileName: path.relative(REPO_ROOT, file),
-      source: stripDocblock(typescriptDef),
-      tripleSlashDirectives: extractTripleSlashDirectives(source),
-    }),
+    generatedModuleSource(file, source, typescriptDef),
   );
 }
 
@@ -213,14 +206,7 @@ function watchGeneratedTypes(translatedFiles: Set<string>): void {
     styleText(['bold', 'inverse'], ' Watching for changes... ') + '\n',
   );
 
-  const packageDirs = new Set(
-    Array.from(translatedFiles).map(file =>
-      path.join(
-        PACKAGES_DIR,
-        path.relative(PACKAGES_DIR, file).split(path.sep)[0],
-      ),
-    ),
-  );
+  const packageDirs = new Set(Array.from(translatedFiles).map(getPackageDir));
 
   for (const packageDir of packageDirs) {
     fsWatch(packageDir, {recursive: true}, (eventType, filename) => {

@@ -68,7 +68,7 @@ type Spec = {
   ...FocusState,
   title: string,
   parentContext: Context,
-  implementation: () => unknown,
+  implementation: TestImplementation,
 };
 
 type Suite = Spec | Context;
@@ -99,10 +99,23 @@ let currentContext: Context = rootContext;
 
 const globalModifiers: Array<'focused' | 'skipped'> = [];
 
-const globalDescribe = (global.describe = (
+type TestImplementation = () => unknown;
+
+type DefineTest = (title: string, implementation: TestImplementation) => void;
+
+export type TestDefinition = {
+  (title: string, implementation: TestImplementation): void,
+  readonly only: DefineTest,
+  readonly skip: DefineTest,
+  ...
+};
+
+export type RegisterHook = (implementation: Hook) => void;
+
+function defineDescribe(
   title: string,
-  implementation: () => unknown,
-) => {
+  implementation: TestImplementation,
+): void {
   const parentContext = currentContext;
   const {focused, skipped} = getFocusState();
   const childContext: Context = {
@@ -120,21 +133,21 @@ const globalDescribe = (global.describe = (
   currentContext = childContext;
   implementation();
   currentContext = parentContext;
-});
+}
 
-global.afterAll = (implementation: () => void) => {
+export const afterAll: RegisterHook = implementation => {
   currentContext.afterAllHooks.push(implementation);
 };
 
-global.afterEach = (implementation: () => void) => {
+export const afterEach: RegisterHook = implementation => {
   currentContext.afterEachHooks.push(implementation);
 };
 
-global.beforeAll = (implementation: () => void) => {
+export const beforeAll: RegisterHook = implementation => {
   currentContext.beforeAllHooks.push(implementation);
 };
 
-global.beforeEach = (implementation: () => void) => {
+export const beforeEach: RegisterHook = implementation => {
   currentContext.beforeEachHooks.push(implementation);
 };
 
@@ -148,68 +161,67 @@ function getFocusState(): {focused: boolean, skipped: boolean} {
   return {focused, skipped};
 }
 
-const globalIt =
-  (global.it =
-  global.test =
-    (title: string, implementation: () => unknown) => {
-      const {focused, skipped} = getFocusState();
-      currentContext.children.push({
-        title,
-        parentContext: currentContext,
-        implementation,
-        focused,
-        skipped,
-      });
-    });
+function defineIt(title: string, implementation: TestImplementation): void {
+  const {focused, skipped} = getFocusState();
+  currentContext.children.push({
+    title,
+    parentContext: currentContext,
+    implementation,
+    focused,
+    skipped,
+  });
+}
 
-// $FlowExpectedError[prop-missing]
-global.fdescribe = global.describe.only = (
-  title: string,
-  implementation: () => unknown,
-) => {
-  globalModifiers.push('focused');
-  globalDescribe(title, implementation);
-  globalModifiers.pop();
-};
+function withModifier(
+  modifier: 'focused' | 'skipped',
+  define: DefineTest,
+): DefineTest {
+  return (title, implementation) => {
+    globalModifiers.push(modifier);
+    define(title, implementation);
+    globalModifiers.pop();
+  };
+}
 
-// $FlowExpectedError[prop-missing]
-global.it.only =
-  global.fit =
-  // $FlowExpectedError[prop-missing]
-  global.test.only =
-    (title: string, implementation: () => unknown) => {
-      globalModifiers.push('focused');
-      globalIt(title, implementation);
-      globalModifiers.pop();
-    };
+function withModifiers(define: DefineTest): TestDefinition {
+  function definition(title: string, implementation: TestImplementation): void {
+    define(title, implementation);
+  }
+  definition.only = withModifier('focused', define);
+  definition.skip = withModifier('skipped', define);
+  return definition;
+}
 
-// $FlowExpectedError[prop-missing]
-global.xdescribe = global.describe.skip = (
-  title: string,
-  implementation: () => unknown,
-) => {
-  globalModifiers.push('skipped');
-  globalDescribe(title, implementation);
-  globalModifiers.pop();
-};
+export const describe: TestDefinition = withModifiers(defineDescribe);
 
-// $FlowExpectedError[prop-missing]
-global.it.skip =
-  global.xit =
-  // $FlowExpectedError[prop-missing]
-  global.test.skip =
-  global.xtest =
-    (title: string, implementation: () => unknown) => {
-      globalModifiers.push('skipped');
-      globalIt(title, implementation);
-      globalModifiers.pop();
-    };
+export const it: TestDefinition = withModifiers(defineIt);
 
-global.jest = {
+export const jest: {readonly fn: typeof createMockFunction} = {
   fn: createMockFunction,
 };
 
-global.expect = expect;
+export {expect};
+
+export const testGlobals = {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  fdescribe: describe.only,
+  xdescribe: describe.skip,
+  it,
+  fit: it.only,
+  xit: it.skip,
+  test: it,
+  xtest: it.skip,
+  jest,
+  expect,
+};
+
+for (const [name, value] of Object.entries(testGlobals)) {
+  global[name] = value;
+}
 
 let testSetupError: ?Error;
 

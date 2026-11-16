@@ -581,6 +581,9 @@ jobs:
       - name: Build react-native package types
         shell: bash
         run: yarn build-types --skip-snapshot
+      - name: Build Fantom types
+        shell: bash
+        run: yarn build-types --fantom
       - name: Validate generated types
         shell: bash
         run: yarn test-generated-typescript

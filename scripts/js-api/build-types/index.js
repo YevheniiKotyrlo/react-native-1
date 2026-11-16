@@ -10,6 +10,7 @@
 
 require('../../shared/babelRegister').registerForScript();
 
+const {ENTRY_POINT, FANTOM_ENTRY_POINTS} = require('../config');
 const buildApiSnapshot = require('./buildApiSnapshot');
 const {
   buildGeneratedTypes,
@@ -22,6 +23,7 @@ const config = {
   options: {
     debug: {type: 'boolean'},
     'debug-version-annotations': {type: 'boolean'},
+    fantom: {type: 'boolean'},
     help: {type: 'boolean'},
     'skip-snapshot': {type: 'boolean'},
     validate: {type: 'boolean'},
@@ -34,6 +36,7 @@ async function main() {
     values: {
       debug: debugEnabled,
       'debug-version-annotations': debugVersionAnnotations,
+      fantom,
       help,
       'skip-snapshot': skipSnapshot,
       validate,
@@ -54,6 +57,9 @@ async function main() {
     --debug-version-annotations
                       Outputs debug info alongside versioned type hashes as
                       part of the API snapshot contents.
+    --fantom          Build the generated types of Fantom, React Native's
+                      integration test runner, which are not published, in
+                      place of react-native's. Skips API snapshot generation.
     --skip-snapshot   Skip API snapshot generation.
     --validate        Validate if the current API snapshot on disk is up to
                       date. Exits with an error if differences are detected.
@@ -72,15 +78,19 @@ async function main() {
     '\n' +
       styleText(
         ['bold', 'inverse'],
-        ' Building generated react-native package types ',
+        fantom === true
+          ? ' Building generated Fantom types '
+          : ' Building generated react-native package types ',
       ) +
       '\n',
   );
-  const translatedFiles = await buildGeneratedTypes();
+  const translatedFiles = await buildGeneratedTypes(
+    fantom === true ? FANTOM_ENTRY_POINTS : [ENTRY_POINT],
+  );
 
   if (watch === true) {
     watchGeneratedTypes(translatedFiles);
-  } else if (!skipSnapshot) {
+  } else if (fantom !== true && !skipSnapshot) {
     console.log(
       styleText(['bold', 'inverse'], ' Building API snapshot ') + '\n',
     );

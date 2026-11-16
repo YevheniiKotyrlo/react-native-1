@@ -33,7 +33,7 @@ module.exports = function entrypointTemplate({
   snapshotConfig: SnapshotConfig,
   jsHeapSnapshotOutputPathTemplate: string,
   jsHeapSnapshotOutputPathTemplateToken: string,
-  jsTraceOutputPath: ?string,
+  jsTraceOutputPath: string | null,
 }): string {
   const constants: FantomRuntimeConstants = {
     isOSS: EnvironmentOptions.isOSS,

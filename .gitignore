@@ -176,6 +176,7 @@ fix_*.patch
 
 # [Experimental] Generated TS type definitions
 /packages/**/types_generated/
+/private/**/types_generated/
 
 # Python
 __pycache__/

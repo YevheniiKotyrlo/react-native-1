@@ -9,12 +9,13 @@
  */
 
 import type {DisplayMetrics} from '../../../packages/react-native/Libraries/Utilities/Dimensions';
+import type ReactNativeDocument from '../../../packages/react-native/src/private/webapis/dom/nodes/ReactNativeDocument';
 import type {HostPlatform} from './Constants';
 import type {
   FantomRenderedOutput,
   RenderOutputConfig,
 } from './getFantomRenderedOutput';
-import type {MixedElement} from 'react';
+import type * as React from 'react';
 import type {HostInstance, RootTag} from 'react-native';
 
 import NativeFantom, {
@@ -39,7 +40,7 @@ interface NodeLike {
   readonly nodeType: number;
 }
 
-type NodeOrRef = NodeLike | Readonly<{current: ?NodeLike}>;
+type NodeOrRef = NodeLike | Readonly<{current: NodeLike | null | void}>;
 
 export type RootConfig = {
   viewportWidth?: number,
@@ -120,7 +121,7 @@ class Root {
   #viewportOffsetY: number;
   #devicePixelRatio: number;
   #fontScale: number;
-  #document: ?Document;
+  #document: ?ReactNativeDocument;
   #destroyed: boolean = false;
 
   constructor(config?: RootConfig) {
@@ -150,7 +151,7 @@ class Root {
   }
 
   // $FlowExpectedError[unsafe-getters-setters]
-  get document(): Document {
+  get document(): ReactNativeDocument {
     if (this.#document == null) {
       throw new Error(
         'Cannot get `document` from root because it has not been rendered.',
@@ -160,7 +161,7 @@ class Root {
     return this.#document;
   }
 
-  render(element: MixedElement): void {
+  render(element: React.MixedElement): void {
     if (!flushingQueue) {
       throw new Error(
         'Unexpected call to `render` outside of the event loop. Please call `render` within a `runTask` callback.',
