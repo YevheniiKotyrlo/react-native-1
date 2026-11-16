@@ -421,6 +421,29 @@ With an output such as:
     [...]
 ```
 
+### Linking native code
+
+The tester calls React Native's autolinking functions,
+`autolinking_cxxModuleProvider` and `autolinking_registerProviders`, as an app's
+`OnLoad.cpp` does, so a library's C++ TurboModules and components reach its
+tests. [`autolinking.h`](../tester/autolinking/include/autolinking.h) declares
+them, and with no library linked, the tester's own definitions provide a module
+and a component, which
+[`FantomAutolinking-itest.js`](../src/__tests__/FantomAutolinking-itest.js)
+tests these calls with. The tester registers the linked components before its
+own, as Android registers an app's before React Native's. To link libraries,
+build the tester with `fantomAutolinkingDirectory`, relative to the repository's
+root: a directory whose `CMakeLists.txt` defines `fantom_autolinking`, a library
+that links `fantom_autolinking_api` and defines those functions, as
+[the tester's own](../tester/autolinking) does. The tests stay where Fantom's
+Jest config finds them, and building the tester again without the property links
+no library.
+
+```shell
+./gradlew :private:react-native-fantom:buildFantomTester -PfantomAutolinkingDirectory=<directory>
+yarn fantom <regexForTestFiles>
+```
+
 ### Debugging
 
 > [!WARNING] Meta-only: debugging only works on Meta's internal infrastructure

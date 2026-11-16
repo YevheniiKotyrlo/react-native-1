@@ -60,6 +60,12 @@ val reactAndroidDownloadsDir =
 
 val testerDir = File("$projectDir/tester")
 val testerBuildDir = File("$buildDir/tester")
+val testerAutolinkingDir: String =
+    project
+        .findProperty("fantomAutolinkingDirectory")
+        ?.toString()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { rootProject.file(it).absolutePath } ?: ""
 val testerBuildOutputFileTree =
     fileTree(testerBuildDir.toString())
         .include("**/*.cmake", "**/*.marks", "**/compiler_depends.ts", "**/Makefile", "**/link.txt")
@@ -318,6 +324,7 @@ val configureFantomTester by
       dependsOn(prepareAllDependencies)
       workingDir(testerDir)
       inputs.dir(testerDir)
+      inputs.property("fantomAutolinkingDirectory", testerAutolinkingDir)
       outputs.files(testerBuildOutputFileTree)
       val cmdArgs =
           mutableListOf(
@@ -329,6 +336,7 @@ val configureFantomTester by
               "-B",
               testerBuildDir.toString(),
               "-DCMAKE_BUILD_TYPE=Debug",
+              "-DFANTOM_AUTOLINKING_DIR=$testerAutolinkingDir",
               "-DFANTOM_CODEGEN_DIR=$buildDir/codegen",
               "-DFANTOM_THIRD_PARTY_DIR=$buildDir/third-party",
               "-DFANTOM_NINJA=$cmakePath/bin/ninja",

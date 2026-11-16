@@ -149,6 +149,27 @@ file(GLOB SOURCES
 list(APPEND SOURCES ${REACT_COMMON_DIR}/react/renderer/components/textinput/BaseTextInputProps.cpp)
 add_executable(fantom_tester ${SOURCES})
 
+# The functions the tester calls on the code linked into it.
+add_library(fantom_autolinking_api INTERFACE)
+target_include_directories(fantom_autolinking_api
+  INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/autolinking/include)
+target_link_libraries(fantom_autolinking_api
+  INTERFACE
+    react_nativemodule_core
+    react_renderer_componentregistry)
+
+# A directory whose CMakeLists.txt defines `fantom_autolinking`, which links
+# `fantom_autolinking_api` and defines its functions for the libraries it links.
+if(FANTOM_AUTOLINKING_DIR)
+  add_subdirectory(${FANTOM_AUTOLINKING_DIR} autolinking)
+else()
+  add_subdirectory(autolinking)
+endif()
+if(NOT TARGET fantom_autolinking)
+  message(FATAL_ERROR
+    "FANTOM_AUTOLINKING_DIR ${FANTOM_AUTOLINKING_DIR} defines no fantom_autolinking target")
+endif()
+
 target_include_directories(fantom_tester PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(fantom_tester
@@ -168,6 +189,10 @@ target_link_libraries(fantom_tester
 
     # codegen
     react_codegen_rncore
+
+    # autolinking: the API first, so the tester's sources read its header whatever the linked code exports
+    fantom_autolinking_api
+    fantom_autolinking
 
     # ReactCommon
     bridgeless

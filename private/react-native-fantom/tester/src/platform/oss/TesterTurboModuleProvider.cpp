@@ -7,11 +7,11 @@
 
 #include "../TesterTurboModuleProvider.h"
 
+#include <autolinking.h>
+
 namespace facebook::react {
 /* static */ TurboModuleProvider
 TesterTurboModuleProvider::getTurboModuleProvider() {
-  return TurboModuleProvider{
-      [](const std::string& name, const std::shared_ptr<CallInvoker>& jsInvoker)
-          -> std::shared_ptr<TurboModule> { return nullptr; }};
+  return TurboModuleProvider{&autolinking_cxxModuleProvider};
 }
 } // namespace facebook::react

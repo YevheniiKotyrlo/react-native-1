@@ -65,6 +65,8 @@ configure_file(
   COPYONLY)
 
 get_target_property(react_common_tests_LIBS fantom_tester LINK_LIBRARIES)
+# ReactCommon's tests never link the libraries autolinked into the tester.
+list(REMOVE_ITEM react_common_tests_LIBS fantom_autolinking)
 
 # Pre-existing failures in OSS, on macOS and Linux alike, excluded by gtest
 # name per test target.
