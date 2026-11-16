@@ -19,4 +19,7 @@ void autolinking_registerProviders(
     std::shared_ptr<const ComponentDescriptorProviderRegistry>
     /*providerRegistry*/) {}
 
+void fantom_didCreateContextContainer(
+    const std::shared_ptr<const ContextContainer>& /*contextContainer*/) {}
+
 } // namespace facebook::react

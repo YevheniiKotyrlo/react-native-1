@@ -11,7 +11,8 @@ target_include_directories(fantom_autolinking PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 target_link_libraries(fantom_autolinking
   PUBLIC
     react_nativemodule_core
-    react_renderer_componentregistry)
+    react_renderer_componentregistry
+    react_utils)
 
 target_compile_options(fantom_autolinking
   PRIVATE

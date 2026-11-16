@@ -433,6 +433,11 @@ those functions, as `autolinking.cpp` does in the folder React Native's Gradle
 plugin generates for an app, with `autolinking.h` in its public include
 directories.
 
+That library also implements `fantom_didCreateContextContainer`, which receives
+the tester's `ContextContainer` before the tester inserts its own entries, as
+`RCTInstance` hands its container to `didCreateContextContainer:`, so an entry
+it inserts takes the place of the tester's.
+
 ```shell
 ./gradlew :private:react-native-fantom:buildFantomTester -PfantomAutolinkingDirectory=<directory>
 yarn fantom <regexForTestFiles>

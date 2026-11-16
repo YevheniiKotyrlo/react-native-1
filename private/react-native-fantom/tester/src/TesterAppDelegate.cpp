@@ -85,6 +85,7 @@ TesterAppDelegate::TesterAppDelegate(
       });
 
   auto contextContainer = std::make_shared<const ContextContainer>();
+  fantom_didCreateContextContainer(contextContainer);
   contextContainer->insert(
       MessageQueueThreadFactoryKey, MessageQueueThreadFactory([&]() {
         auto queue = std::make_shared<StubQueue>();
