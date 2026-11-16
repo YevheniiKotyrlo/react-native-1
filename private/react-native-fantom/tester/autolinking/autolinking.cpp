@@ -8,11 +8,16 @@
 #include <autolinking.h>
 
 #include <jsi/jsi.h>
+#include <react/http/IHttpClient.h>
+#include <react/http/IWebSocketClient.h>
 #include <react/renderer/components/view/ConcreteViewShadowNode.h>
 #include <react/renderer/components/view/ViewProps.h>
 #include <react/renderer/core/ConcreteComponentDescriptor.h>
 #include <react/renderer/core/propsConversions.h>
 #include <react/renderer/debug/debugStringConvertibleUtils.h>
+#include <react/renderer/runtimescheduler/RuntimeScheduler.h>
+#include <react/renderer/textlayoutmanager/TextLayoutManager.h>
+#include <react/threading/MessageQueueThreadImpl.h>
 
 // What FantomAutolinking-itest.js reaches through the tester's calls.
 namespace facebook::react {
@@ -21,6 +26,33 @@ extern const char FantomAutolinkingTestViewComponentName[] =
     "FantomAutolinkingTestView";
 
 namespace {
+
+constexpr auto kContextContainerRecordKey =
+    "FantomAutolinkingTestContextContainerRecord";
+
+std::string& contextContainerRecordTheViewRead() {
+  static std::string record =
+      "no FantomAutolinkingTestView descriptor read the container";
+  return record;
+}
+
+bool& didRunTaskOnItsOwnQueue() {
+  static bool didRun = false;
+  return didRun;
+}
+
+std::shared_ptr<MessageQueueThread>& ownQueue() {
+  static std::shared_ptr<MessageQueueThread> queue;
+  return queue;
+}
+
+template <typename T>
+std::string presenceOf(
+    const ContextContainer& contextContainer,
+    const char* key) {
+  return std::string{key} +
+      (contextContainer.find<T>(key).has_value() ? " present" : " absent");
+}
 
 class FantomAutolinkingTestViewProps final : public ViewProps {
  public:
@@ -53,8 +85,17 @@ using FantomAutolinkingTestViewShadowNode = ConcreteViewShadowNode<
     FantomAutolinkingTestViewComponentName,
     FantomAutolinkingTestViewProps>;
 
-using FantomAutolinkingTestViewComponentDescriptor =
-    ConcreteComponentDescriptor<FantomAutolinkingTestViewShadowNode>;
+class FantomAutolinkingTestViewComponentDescriptor
+    : public ConcreteComponentDescriptor<FantomAutolinkingTestViewShadowNode> {
+ public:
+  explicit FantomAutolinkingTestViewComponentDescriptor(
+      const ComponentDescriptorParameters& parameters)
+      : ConcreteComponentDescriptor(parameters) {
+    contextContainerRecordTheViewRead() =
+        contextContainer_->find<std::string>(kContextContainerRecordKey)
+            .value_or("the container the view read holds no record");
+  }
+};
 
 class FantomAutolinkingTestModule : public TurboModule {
  public:
@@ -67,6 +108,23 @@ class FantomAutolinkingTestModule : public TurboModule {
                       const jsi::Value* /*arguments*/,
                       size_t /*count*/) -> jsi::Value {
           return jsi::String::createFromAscii(runtime, "autolinked");
+        }};
+    methodMap_["getContextContainerRecord"] = MethodMetadata{
+        .argCount = 0,
+        .invoker = [](jsi::Runtime& runtime,
+                      TurboModule& /*turboModule*/,
+                      const jsi::Value* /*arguments*/,
+                      size_t /*count*/) -> jsi::Value {
+          return jsi::String::createFromUtf8(
+              runtime, contextContainerRecordTheViewRead());
+        }};
+    methodMap_["didRunTaskOnItsOwnQueue"] = MethodMetadata{
+        .argCount = 0,
+        .invoker = [](jsi::Runtime& /*runtime*/,
+                      TurboModule& /*turboModule*/,
+                      const jsi::Value* /*arguments*/,
+                      size_t /*count*/) -> jsi::Value {
+          return jsi::Value(didRunTaskOnItsOwnQueue());
         }};
   }
 };
@@ -88,6 +146,37 @@ void autolinking_registerProviders(
   providerRegistry->add(
       concreteComponentDescriptorProvider<
           FantomAutolinkingTestViewComponentDescriptor>());
+}
+
+void fantom_didCreateContextContainer(
+    const std::shared_ptr<const ContextContainer>& contextContainer) {
+  const auto& container = *contextContainer;
+  contextContainer->insert(
+      kContextContainerRecordKey,
+      presenceOf<MessageQueueThreadFactory>(
+          container, MessageQueueThreadFactoryKey) +
+          ", " +
+          presenceOf<HttpClientFactory>(container, HttpClientFactoryKey) +
+          ", " +
+          presenceOf<WebSocketClientFactory>(
+              container, WebSocketClientFactoryKey) +
+          ", " +
+          presenceOf<HttpClientFactory>(
+              container, DevToolsHttpClientFactoryKey) +
+          ", " +
+          presenceOf<WebSocketClientFactory>(
+              container, DevToolsWebSocketClientFactoryKey) +
+          ", " +
+          presenceOf<std::shared_ptr<TextLayoutManager>>(
+              container, "TextLayoutManager") +
+          ", " +
+          presenceOf<std::weak_ptr<RuntimeScheduler>>(
+              container, RuntimeSchedulerKey));
+  if (auto makeQueue = container.find<MessageQueueThreadFactory>(
+          MessageQueueThreadFactoryKey)) {
+    ownQueue() = (*makeQueue)();
+    ownQueue()->runOnQueue([]() { didRunTaskOnItsOwnQueue() = true; });
+  }
 }
 
 } // namespace facebook::react

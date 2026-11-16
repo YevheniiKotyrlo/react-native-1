@@ -14,7 +14,11 @@ target_link_libraries(fantom_autolinking
     fantom_autolinking_api
   PRIVATE
     jsi
+    react_cxx_platform_react_http
+    react_cxx_platform_react_threading
     react_renderer_core
+    react_renderer_runtimescheduler
+    react_renderer_textlayoutmanager
     rrc_view)
 
 target_compile_options(fantom_autolinking

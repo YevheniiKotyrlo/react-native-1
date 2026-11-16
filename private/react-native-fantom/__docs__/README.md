@@ -444,6 +444,15 @@ no library.
 yarn fantom <regexForTestFiles>
 ```
 
+The linked code also defines `fantom_didCreateContextContainer`, which receives
+the tester's `ContextContainer`, as iOS's `RCTInstance` hands its container to
+`didCreateContextContainer:`, once the tester has inserted its message queue and
+network client factories and before React Native reads it. An entry it inserts
+takes the place of one inserted later for the same key, such as the tester's
+`TextLayoutManager`, and never of those factories; screenshots still paint text
+with the tester's own layout. A queue it makes with the message queue factory
+runs its tasks whenever Fantom runs the JavaScript queue's.
+
 ### Debugging
 
 > [!WARNING] Meta-only: debugging only works on Meta's internal infrastructure

@@ -9,6 +9,7 @@
 
 #include "FantomTimerRegistry.h"
 #include "NativeFantom.h"
+#include "platform/TesterContextContainer.h"
 #include "platform/TesterTurboModuleProvider.h"
 #include "stubs/StubClock.h"
 #include "stubs/StubHttpClient.h"
@@ -33,6 +34,7 @@
 #include <react/threading/MessageQueueThreadImpl.h>
 #include <react/utils/ContextContainer.h>
 #include <react/utils/RunLoopObserverManager.h>
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -87,7 +89,10 @@ TesterAppDelegate::TesterAppDelegate(
   contextContainer->insert(
       MessageQueueThreadFactoryKey, MessageQueueThreadFactory([&]() {
         auto queue = std::make_shared<StubQueue>();
-        queue_ = queue;
+        std::erase_if(queues_, [](const std::weak_ptr<StubQueue>& made) {
+          return made.expired();
+        });
+        queues_.push_back(queue);
         return queue;
       }));
   contextContainer->insert(HttpClientFactoryKey, getStubHttpClientFactory());
@@ -97,6 +102,7 @@ TesterAppDelegate::TesterAppDelegate(
       DevToolsHttpClientFactoryKey, getHttpClientFactory());
   contextContainer->insert(
       DevToolsWebSocketClientFactoryKey, getWebSocketClientFactory());
+  TesterContextContainer::didCreate(contextContainer);
 
   runLoopObserverManager_ = std::make_shared<RunLoopObserverManager>();
 
@@ -387,18 +393,21 @@ void TesterAppDelegate::runUITick() {
 }
 
 void TesterAppDelegate::flushMessageQueue() {
-  if (auto queue = queue_.lock()) {
-    queue->flush();
+  // A task can make a queue, so the loop walks the queues made before it.
+  const auto queues = queues_;
+  for (const auto& made : queues) {
+    if (auto queue = made.lock()) {
+      queue->flush();
+    }
   }
   runUITick();
 }
 
 bool TesterAppDelegate::hasPendingTasksInMessageQueue() {
-  if (auto queue = queue_.lock()) {
-    return queue->hasPendingCallbacks();
-  } else {
-    return false;
-  }
+  return std::ranges::any_of(queues_, [](const std::weak_ptr<StubQueue>& made) {
+    auto queue = made.lock();
+    return queue != nullptr && queue->hasPendingCallbacks();
+  });
 }
 
 std::vector<std::string> TesterAppDelegate::getConsoleLogs() {

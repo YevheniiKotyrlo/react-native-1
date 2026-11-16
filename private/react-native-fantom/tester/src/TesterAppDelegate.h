@@ -89,7 +89,7 @@ class TesterAppDelegate {
   std::vector<std::string> getConsoleLogs();
 
   std::unique_ptr<ReactHost> reactHost_;
-  std::weak_ptr<StubQueue> queue_;
+  std::vector<std::weak_ptr<StubQueue>> queues_;
 
   std::shared_ptr<RunLoopObserverManager> runLoopObserverManager_;
 

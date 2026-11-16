@@ -10,6 +10,7 @@
 #include <ReactCommon/CallInvoker.h>
 #include <ReactCommon/TurboModule.h>
 #include <react/renderer/componentregistry/ComponentDescriptorProviderRegistry.h>
+#include <react/utils/ContextContainer.h>
 #include <memory>
 #include <string>
 
@@ -21,5 +22,8 @@ std::shared_ptr<TurboModule> autolinking_cxxModuleProvider(
     const std::shared_ptr<CallInvoker> &jsInvoker);
 
 void autolinking_registerProviders(std::shared_ptr<const ComponentDescriptorProviderRegistry> providerRegistry);
+
+// Receives the tester's ContextContainer once it holds its message queue and network client factories.
+void fantom_didCreateContextContainer(const std::shared_ptr<const ContextContainer> &contextContainer);
 
 } // namespace facebook::react

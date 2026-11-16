@@ -156,7 +156,8 @@ target_include_directories(fantom_autolinking_api
 target_link_libraries(fantom_autolinking_api
   INTERFACE
     react_nativemodule_core
-    react_renderer_componentregistry)
+    react_renderer_componentregistry
+    react_utils)
 
 # A directory whose CMakeLists.txt defines `fantom_autolinking`, which links
 # `fantom_autolinking_api` and defines its functions for the libraries it links.
