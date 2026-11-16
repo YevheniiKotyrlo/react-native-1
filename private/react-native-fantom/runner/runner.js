@@ -297,16 +297,6 @@ module.exports = async function runTest(
   ];
 
   for (const testConfig of testConfigs) {
-    if (EnvironmentOptions.isOSS && testConfig.isNativeOptimized) {
-      testResultsByConfig.push(
-        skippedTestResults({
-          ancestorTitles: ['"@fantom_mode opt" in docblock'],
-          title: 'Optimized mode is not yet supported in OSS',
-        }),
-      );
-      continue;
-    }
-
     if (
       EnvironmentOptions.isOSS &&
       testConfig.hermesVariant !== HermesVariantEnum.Hermes
@@ -317,16 +307,6 @@ module.exports = async function runTest(
             '"@fantom_hermes_variant static_hermes" in docblock (shermes 🧪)',
           ],
           title: 'Static Hermes is not yet supported in OSS',
-        }),
-      );
-      continue;
-    }
-
-    if (EnvironmentOptions.isOSS && testConfig.isJsBytecode) {
-      testResultsByConfig.push(
-        skippedTestResults({
-          ancestorTitles: ['"@fantom_mode dev" in docblock'],
-          title: 'Hermes bytecode is not yet supported in OSS',
         }),
       );
       continue;

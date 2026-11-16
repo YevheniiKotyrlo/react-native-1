@@ -384,6 +384,10 @@ Available pragmas:
 Setting `@fantom_mode` is mutually exclusive with setting any of
 `@fantom_native_opt`, `@fantom_js_opt`, and `@fantom_js_bytecode`.
 
+Outside Meta's infrastructure, Gradle builds the optimized tester as
+`RelWithDebInfo` into `private/react-native-fantom/build/tester-opt`, and the
+`hermesc` it builds with Hermes compiles the bytecode.
+
 For all pragmas, except non-boolean feature flags, you can use a wildcard (`*`)
 as value to run the test with all possible values for that pragma. For example,
 this test:

@@ -89,4 +89,7 @@ runs:
       with:
         name: fantom-runner-binary
         compression-level: 1
-        path: private/react-native-fantom/build/tester/
+        path: |
+          private/react-native-fantom/build/tester/
+          private/react-native-fantom/build/tester-opt/
+          packages/react-native/ReactAndroid/hermes-engine/build/hermes/bin/hermesc

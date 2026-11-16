@@ -10,8 +10,8 @@
 
 import type {HermesVariant, SyncCommandResult} from '../utils';
 
-import {isCI} from '../EnvironmentOptions';
-import {NATIVE_BUILD_OUTPUT_PATH} from '../paths';
+import {isCI, isOSS} from '../EnvironmentOptions';
+import {NATIVE_BUILD_OUTPUT_PATH, PROJECT_ROOT} from '../paths';
 import {
   getBuckModesForPlatform,
   getBuckOptionsForHermes,
@@ -30,16 +30,36 @@ type HermescOptions = Readonly<{
   hermesVariant: HermesVariant,
 }>;
 
+// Gradle's tester tasks build hermesc beside the Hermes library the tester links.
+const GRADLE_HERMES_COMPILER_PATH = path.join(
+  PROJECT_ROOT,
+  'packages',
+  'react-native',
+  'ReactAndroid',
+  'hermes-engine',
+  'build',
+  'hermes',
+  'bin',
+  'hermesc',
+);
+
 function getHermesCompilerPath({
   enableOptimized,
   hermesVariant,
 }: HermescOptions): string {
+  if (isOSS) {
+    return GRADLE_HERMES_COMPILER_PATH;
+  }
   return path.join(
     NATIVE_BUILD_OUTPUT_PATH,
     `hermesc-${(hermesVariant as string).toLowerCase()}-${enableOptimized ? 'opt' : 'dev'}`,
   );
 }
 export function build(options: HermescOptions): void {
+  if (isOSS) {
+    return;
+  }
+
   const destPath = getHermesCompilerPath(options);
   if (fs.existsSync(destPath)) {
     return;

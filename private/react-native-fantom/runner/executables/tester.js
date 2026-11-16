@@ -54,31 +54,35 @@ type TesterOptions = Readonly<{
   hermesVariant: HermesVariant,
 }>;
 
-type GradleTesterVariant = 'dev' | Sanitizer;
+type GradleTesterVariant = 'dev' | 'opt' | Sanitizer;
 
 type GradleTesterBuild = Readonly<{directory: string, task: string}>;
 
 // build.gradle.kts registers these tasks, each building its variant into its directory.
 const GRADLE_TESTER_BUILDS: Readonly<{
   dev: GradleTesterBuild,
+  opt: GradleTesterBuild,
   asan: GradleTesterBuild,
   tsan: GradleTesterBuild,
 }> = {
   dev: {directory: 'tester', task: 'buildFantomTester'},
+  opt: {directory: 'tester-opt', task: 'buildFantomTesterOpt'},
   asan: {directory: 'tester-asan', task: 'buildFantomTesterAsan'},
   tsan: {directory: 'tester-tsan', task: 'buildFantomTesterTsan'},
 };
 
-function selectGradleTester(enableOptimized: boolean): Readonly<{
-  variant: GradleTesterVariant,
-  warning: ?string,
-}> {
-  const {sanitizer, warning} = selectSanitizer({
-    enableASAN,
-    enableOptimized,
-    enableTSAN,
-  });
-  return {variant: sanitizer ?? 'dev', warning};
+export function selectGradleTester(
+  options: Readonly<{
+    enableASAN: boolean,
+    enableOptimized: boolean,
+    enableTSAN: boolean,
+  }>,
+): Readonly<{variant: GradleTesterVariant, warning: ?string}> {
+  const {sanitizer, warning} = selectSanitizer(options);
+  return {
+    variant: options.enableOptimized ? 'opt' : (sanitizer ?? 'dev'),
+    warning,
+  };
 }
 
 export function getGradleTesterPath(variant: GradleTesterVariant): string {
@@ -95,7 +99,11 @@ export function getFantomTesterPath({
 }: TesterOptions): string {
   if (isOSS) {
     return getGradleTesterPath(
-      selectGradleTester(options.enableOptimized).variant,
+      selectGradleTester({
+        enableASAN,
+        enableOptimized: options.enableOptimized,
+        enableTSAN,
+      }).variant,
     );
   }
   return path.join(
@@ -105,7 +113,11 @@ export function getFantomTesterPath({
 }
 
 function buildWithGradle(options: TesterOptions): void {
-  const {variant, warning} = selectGradleTester(options.enableOptimized);
+  const {variant, warning} = selectGradleTester({
+    enableASAN,
+    enableOptimized: options.enableOptimized,
+    enableTSAN,
+  });
   if (fs.existsSync(getGradleTesterPath(variant))) {
     return;
   }

@@ -7,5 +7,5 @@
 set -e
 
 pushd ../..
-./gradlew :private:react-native-fantom:buildFantomTester
+./gradlew :private:react-native-fantom:buildFantomTester :private:react-native-fantom:buildFantomTesterOpt
 popd

@@ -18,10 +18,14 @@ runs:
       uses: ./.github/actions/download-artifact
       with:
         name: fantom-runner-binary
-        path: private/react-native-fantom/build/tester
-    - name: Make binary executable
+        path: .
+    - name: Make binaries executable
       shell: bash
-      run: chmod +x private/react-native-fantom/build/tester/fantom_tester
+      run: |
+        chmod +x \
+          private/react-native-fantom/build/tester/fantom_tester \
+          private/react-native-fantom/build/tester-opt/fantom_tester \
+          packages/react-native/ReactAndroid/hermes-engine/build/hermes/bin/hermesc
     - name: Run Fantom Tests
       shell: bash
       run: |

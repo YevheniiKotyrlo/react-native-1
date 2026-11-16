@@ -61,9 +61,14 @@ val reactAndroidDownloadsDir =
 val testerDir = File("$projectDir/tester")
 
 // Each variant builds into a directory of its own, from which runner/executables/tester.js runs it.
-class FantomTesterVariant(val taskSuffix: String, val directory: File, val sanitizer: String?)
+class FantomTesterVariant(
+    val taskSuffix: String,
+    val directory: File,
+    val buildType: String,
+    val sanitizer: String?,
+)
 
-val defaultFantomTester = FantomTesterVariant("", File("$buildDir/tester"), null)
+val defaultFantomTester = FantomTesterVariant("", File("$buildDir/tester"), "Debug", null)
 val testerBuildDir = defaultFantomTester.directory
 
 fun testerBuildOutputFileTree(variant: FantomTesterVariant) =
@@ -335,7 +340,7 @@ fun registerFantomTesterTasks(variant: FantomTesterVariant): TaskProvider<Custom
                 ".",
                 "-B",
                 variant.directory.toString(),
-                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DCMAKE_BUILD_TYPE=${variant.buildType}",
                 "-DFANTOM_CODEGEN_DIR=$buildDir/codegen",
                 "-DFANTOM_THIRD_PARTY_DIR=$buildDir/third-party",
                 "-DFANTOM_NINJA=$cmakePath/bin/ninja",
@@ -388,9 +393,17 @@ fun registerFantomTesterTasks(variant: FantomTesterVariant): TaskProvider<Custom
 
 val configureFantomTester = registerFantomTesterTasks(defaultFantomTester)
 
-registerFantomTesterTasks(FantomTesterVariant("Asan", File("$buildDir/tester-asan"), "address"))
+registerFantomTesterTasks(
+    FantomTesterVariant("Asan", File("$buildDir/tester-asan"), "Debug", "address")
+)
 
-registerFantomTesterTasks(FantomTesterVariant("Tsan", File("$buildDir/tester-tsan"), "thread"))
+registerFantomTesterTasks(
+    FantomTesterVariant("Tsan", File("$buildDir/tester-tsan"), "Debug", "thread")
+)
+
+registerFantomTesterTasks(
+    FantomTesterVariant("Opt", File("$buildDir/tester-opt"), "RelWithDebInfo", null)
+)
 
 val buildReactCommonTests by
     tasks.registering(CustomExecTask::class) {

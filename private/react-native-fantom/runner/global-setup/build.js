@@ -44,14 +44,16 @@ export default async function build(
   env: EnvironmentOverrides,
 ): Promise<void> {
   if (isOSS) {
-    buildFantomTester(
-      {
-        enableCoverage: false,
-        enableOptimized: false,
-        hermesVariant: HermesVariant.Hermes,
-      },
-      env,
-    );
+    for (const enableOptimized of [false, true]) {
+      buildFantomTester(
+        {
+          enableCoverage: false,
+          enableOptimized,
+          hermesVariant: HermesVariant.Hermes,
+        },
+        env,
+      );
+    }
     return;
   }
 
