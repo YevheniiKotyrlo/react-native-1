@@ -469,6 +469,11 @@ For thread sanitizer, correspondingly, use flag `FANTOM_ENABLE_TSAN`:
 FANTOM_ENABLE_TSAN=1 yarn fantom <regexForTestFiles>
 ```
 
+In OSS these flags are not read: build the tester with the `fantomSanitizer`
+Gradle property and run it with `FANTOM_TESTER_PATH`, as
+[Building and extending the tester in OSS](#building-and-extending-the-tester-in-oss)
+shows.
+
 ### Profiling
 
 #### JS sampling profiler
@@ -567,6 +572,37 @@ to build different binary variants at the same time.
 
 CI environments (`SANDCASTLE`, `GITHUB_ACTIONS`) auto-detect this mode — see
 [`runner/EnvironmentOptions.js`](../runner/EnvironmentOptions.js).
+
+### Building and extending the tester in OSS
+
+The tester's Gradle build takes these properties:
+
+| Property                     | Default        | Sets                                                     |
+| ---------------------------- | -------------- | -------------------------------------------------------- |
+| `fantomTesterBuildDirectory` | `build/tester` | where the tester is configured and built                 |
+| `fantomBuildType`            | `Debug`        | its CMake build type                                     |
+| `fantomSanitizer`            | none           | `address` or `thread`, the sanitizer its C++ is built in |
+| `fantomExtensionDirectory`   | none           | native code linked into the tester, as below             |
+
+`FANTOM_TESTER_PATH` names the tester an OSS run executes in place of
+`build/tester/fantom_tester`:
+
+```shell
+./gradlew :private:react-native-fantom:buildFantomTester \
+  -PfantomTesterBuildDirectory=/tmp/fantom-tester-asan -PfantomSanitizer=address
+FANTOM_TESTER_PATH=/tmp/fantom-tester-asan/fantom_tester yarn fantom <regexForTestFiles>
+```
+
+The extension directory's `CMakeLists.txt` defines a `fantom_extension` target,
+an `OBJECT` library so every object is linked. Its sources include
+`TesterExtensions.h` from the tester's `src` directory
+(`${PROJECT_SOURCE_DIR}/src`) and register, while the tester loads, component
+descriptor providers (`registerTesterComponentDescriptorProvider`) and entries
+for the tester's `ContextContainer` (`registerTesterContextContainerSetup`).
+
+`FANTOM_METRO_CONFIG_PATH` names a Metro config loaded over Fantom's, as Metro
+loads a config file over its defaults: an object is merged over Fantom's config,
+and a function is given Fantom's config and its result merged over it.
 
 ### FAQ
 

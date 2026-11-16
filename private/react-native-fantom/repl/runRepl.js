@@ -14,7 +14,7 @@ import {isCI, isOSS} from '../runner/EnvironmentOptions';
 import {run as runTester} from '../runner/executables/tester';
 import getHostPlatform from '../runner/getHostPlatform';
 import {getTestBuildOutputPath} from '../runner/paths';
-import {HermesVariant, runCommand} from '../runner/utils';
+import {HermesVariant} from '../runner/utils';
 import {
   PROJECT_ROOT,
   buildWarmupBundle,
@@ -104,17 +104,6 @@ function buildBanner(): string {
 }
 
 function spawnTester(args: ReadonlyArray<string>): AsyncCommandResult {
-  if (isOSS) {
-    const ossPath = path.resolve(
-      __dirname,
-      '..',
-      'build',
-      'tester',
-      'fantom_tester',
-    );
-    return runCommand(ossPath, args, {});
-  }
-
   return runTester(
     args,
     {

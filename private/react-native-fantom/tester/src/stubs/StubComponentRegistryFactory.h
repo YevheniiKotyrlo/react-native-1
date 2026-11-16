@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "../TesterExtensions.h"
 #include "FantomTextInput.h"
 
 #include <react/renderer/componentregistry/ComponentDescriptorFactory.h>
@@ -31,6 +32,9 @@ inline ComponentRegistryFactory getDefaultComponentRegistryFactory(std::shared_p
     contextContainer->insert("TextLayoutManager", textLayoutManager);
     static const auto providerRegistry = []() {
       auto providerRegistry = std::make_shared<ComponentDescriptorProviderRegistry>();
+      for (const auto &provider : getTesterComponentDescriptorProviders()) {
+        providerRegistry->add(provider);
+      }
       providerRegistry->add(concreteComponentDescriptorProvider<ImageComponentDescriptor>());
       providerRegistry->add(concreteComponentDescriptorProvider<LayoutConformanceComponentDescriptor>());
       providerRegistry->add(concreteComponentDescriptorProvider<ParagraphComponentDescriptor>());

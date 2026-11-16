@@ -9,6 +9,7 @@
 
 #include "FantomTimerRegistry.h"
 #include "NativeFantom.h"
+#include "TesterExtensions.h"
 #include "platform/TesterTurboModuleProvider.h"
 #include "stubs/StubClock.h"
 #include "stubs/StubHttpClient.h"
@@ -97,6 +98,7 @@ TesterAppDelegate::TesterAppDelegate(
       DevToolsHttpClientFactoryKey, getHttpClientFactory());
   contextContainer->insert(
       DevToolsWebSocketClientFactoryKey, getWebSocketClientFactory());
+  applyTesterContextContainerSetups(*contextContainer);
 
   runLoopObserverManager_ = std::make_shared<RunLoopObserverManager>();
 

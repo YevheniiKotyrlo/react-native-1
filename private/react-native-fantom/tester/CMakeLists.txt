@@ -13,6 +13,17 @@ endif()
 
 project(fantom_tester)
 
+set(FANTOM_SANITIZER "" CACHE STRING
+  "The sanitizer the tester's C++ is built under: address or thread")
+if(FANTOM_SANITIZER)
+  if(NOT FANTOM_SANITIZER MATCHES "^(address|thread)$")
+    message(FATAL_ERROR
+      "FANTOM_SANITIZER is address or thread, not ${FANTOM_SANITIZER}")
+  endif()
+  add_compile_options(-fsanitize=${FANTOM_SANITIZER} -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=${FANTOM_SANITIZER})
+endif()
+
 include_directories(${REACT_ANDROID_DIR}/hermes-engine/build/prefab-headers)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/")
@@ -264,3 +275,12 @@ target_compile_options(fantom_tester
     -std=c++20)
 
 add_subdirectory(react-common-tests)
+
+# Linked after react-common-tests reads fantom_tester's libraries, so the
+# ReactCommon test executables do not link it.
+set(FANTOM_EXTENSION_DIRECTORY "" CACHE PATH
+  "A directory whose CMakeLists.txt defines a fantom_extension target, linked into the tester")
+if(FANTOM_EXTENSION_DIRECTORY)
+  add_subdirectory(${FANTOM_EXTENSION_DIRECTORY} fantom_extension)
+  target_link_libraries(fantom_tester PRIVATE fantom_extension)
+endif()

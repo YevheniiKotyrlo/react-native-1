@@ -11,10 +11,10 @@
 import type {Server as HttpServer} from 'node:http';
 import type {Server as HttpsServer} from 'node:https';
 
+import loadFantomMetroConfig from '../runner/loadFantomMetroConfig';
 import * as Metro from 'metro';
 import {mergeConfig} from 'metro-config';
 import {Server as NetServer} from 'node:net';
-import path from 'node:path';
 
 let metroServer: ?(HttpServer | HttpsServer) = null;
 
@@ -27,9 +27,7 @@ export async function startMetroServer(): Promise<void> {
 
   const port = Number(process.env.__FANTOM_METRO_PORT__);
 
-  const baseConfig = await Metro.loadConfig({
-    config: path.resolve(__dirname, '..', 'config', 'metro.config.js'),
-  });
+  const baseConfig = await loadFantomMetroConfig();
 
   // Force the chosen port over the default one baked into the config.
   const metroConfig = mergeConfig(baseConfig, {server: {port}});

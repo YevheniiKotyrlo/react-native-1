@@ -59,7 +59,17 @@ val reactAndroidDownloadsDir =
     }
 
 val testerDir = File("$projectDir/tester")
-val testerBuildDir = File("$buildDir/tester")
+// Gradle properties:
+//   -PfantomTesterBuildDirectory=<directory>  where the tester is configured and built
+//   -PfantomBuildType=<CMake build type>      Debug when absent
+//   -PfantomSanitizer=address|thread          the sanitizer its C++ is built under
+//   -PfantomExtensionDirectory=<directory>    native code linked into the tester
+val testerBuildDir =
+    (findProperty("fantomTesterBuildDirectory") as String?)?.let { file(it) }
+        ?: File("$buildDir/tester")
+val testerBuildType = findProperty("fantomBuildType") as String? ?: "Debug"
+val testerSanitizer = findProperty("fantomSanitizer") as String? ?: ""
+val testerExtensionDir = findProperty("fantomExtensionDirectory") as String? ?: ""
 val testerBuildOutputFileTree =
     fileTree(testerBuildDir.toString())
         .include("**/*.cmake", "**/*.marks", "**/compiler_depends.ts", "**/Makefile", "**/link.txt")
@@ -318,6 +328,9 @@ val configureFantomTester by
       dependsOn(prepareAllDependencies)
       workingDir(testerDir)
       inputs.dir(testerDir)
+      inputs.property("fantomBuildType", testerBuildType)
+      inputs.property("fantomSanitizer", testerSanitizer)
+      inputs.property("fantomExtensionDirectory", testerExtensionDir)
       outputs.files(testerBuildOutputFileTree)
       val cmdArgs =
           mutableListOf(
@@ -328,7 +341,9 @@ val configureFantomTester by
               ".",
               "-B",
               testerBuildDir.toString(),
-              "-DCMAKE_BUILD_TYPE=Debug",
+              "-DCMAKE_BUILD_TYPE=$testerBuildType",
+              "-DFANTOM_SANITIZER=$testerSanitizer",
+              "-DFANTOM_EXTENSION_DIRECTORY=$testerExtensionDir",
               "-DFANTOM_CODEGEN_DIR=$buildDir/codegen",
               "-DFANTOM_THIRD_PARTY_DIR=$buildDir/third-party",
               "-DFANTOM_NINJA=$cmakePath/bin/ninja",

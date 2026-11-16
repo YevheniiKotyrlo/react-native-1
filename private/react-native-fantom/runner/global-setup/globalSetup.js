@@ -15,6 +15,7 @@ import {
   isOSS,
   validateEnvironmentVariables,
 } from '../EnvironmentOptions';
+import loadFantomMetroConfig from '../loadFantomMetroConfig';
 import {getTestBuildOutputPath} from '../paths';
 import build from './build';
 import {
@@ -23,7 +24,6 @@ import {
 } from '@react-native/dev-middleware';
 import * as Metro from 'metro';
 import {Server} from 'node:net';
-import path from 'node:path';
 
 export default async function globalSetup(
   globalConfig: {
@@ -48,9 +48,7 @@ export default async function globalSetup(
 }
 
 async function startMetroServer() {
-  const metroConfig = await Metro.loadConfig({
-    config: path.resolve(__dirname, '..', '..', 'config', 'metro.config.js'),
-  });
+  const metroConfig = await loadFantomMetroConfig();
 
   if (process.env.__FANTOM_METRO_PORT__ == null) {
     const availablePort = await findAvailablePort();
