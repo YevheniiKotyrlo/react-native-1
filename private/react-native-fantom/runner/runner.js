@@ -64,7 +64,6 @@ import {
   HermesVariant as HermesVariantEnum,
   getDebugInfoFromCommandResult,
   printConsoleLog,
-  runCommand,
   symbolicateJSTrace,
   symbolicateStackTrace,
 } from './utils';
@@ -443,13 +442,11 @@ module.exports = async function runTest(
       hermesVariant: testConfig.hermesVariant,
       enableCoverage: collectCoverage,
     };
-    const rnTesterCommandResult = EnvironmentOptions.isOSS
-      ? runCommand(
-          path.join(__dirname, '..', 'build', 'tester', 'fantom_tester'),
-          rnTesterCommandArgs,
-          env,
-        )
-      : runFantomTester(rnTesterCommandArgs, rnTesterOptions, env);
+    const rnTesterCommandResult = runFantomTester(
+      rnTesterCommandArgs,
+      rnTesterOptions,
+      env,
+    );
 
     const [processedResult, benchmarkResult] =
       await processRNTesterCommandResult(rnTesterCommandResult);
@@ -572,9 +569,7 @@ module.exports = async function runTest(
 
     if (globalConfig.collectCoverage) {
       try {
-        const binaryPath = EnvironmentOptions.isOSS
-          ? path.join(__dirname, '..', 'build', 'tester', 'fantom_tester')
-          : getFantomTesterPath(rnTesterOptions);
+        const binaryPath = getFantomTesterPath(rnTesterOptions);
 
         const cppCoverageMap = await processLLVMCoverage(
           testCoveragePath,

@@ -12,19 +12,36 @@ import type {
   AsyncCommandResult,
   EnvironmentOverrides,
   HermesVariant,
+  Sanitizer,
 } from '../utils';
 
-import {debugCpp, isCI, profileCpp} from '../EnvironmentOptions';
-import {CPP_TRACES_OUTPUT_PATH, NATIVE_BUILD_OUTPUT_PATH} from '../paths';
+import {
+  debugCpp,
+  enableASAN,
+  enableTSAN,
+  isCI,
+  isOSS,
+  profileCpp,
+} from '../EnvironmentOptions';
+import {
+  CPP_TRACES_OUTPUT_PATH,
+  GRADLE_BUILD_OUTPUT_PATH,
+  NATIVE_BUILD_OUTPUT_PATH,
+  PROJECT_ROOT,
+} from '../paths';
 import {
   getBuckModesForPlatform,
   getBuckOptionsForHermes,
   getDebugInfoFromCommandResult,
+  maybeLogCommand,
+  printConsoleLog,
   runBuck2,
   runBuck2Sync,
   runCommand,
   runCommandSync,
+  selectSanitizer,
 } from '../utils';
+import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,17 +55,98 @@ type TesterOptions = Readonly<{
   hermesVariant: HermesVariant,
 }>;
 
+type GradleTesterVariant = 'dev' | Sanitizer;
+
+type GradleTesterBuild = Readonly<{directory: string, task: string}>;
+
+export const GRADLE_TESTER_BUILDS: Readonly<{
+  dev: GradleTesterBuild,
+  asan: GradleTesterBuild,
+  tsan: GradleTesterBuild,
+}> = {
+  dev: {directory: 'tester', task: 'buildFantomTester'},
+  asan: {directory: 'tester-asan', task: 'buildFantomTesterAsan'},
+  tsan: {directory: 'tester-tsan', task: 'buildFantomTesterTsan'},
+};
+
+export function selectGradleTester(
+  options: Readonly<{
+    enableASAN: boolean,
+    enableOptimized: boolean,
+    enableTSAN: boolean,
+  }>,
+): Readonly<{
+  variant: GradleTesterVariant,
+  warning: ?string,
+}> {
+  const {sanitizer, warning} = selectSanitizer(options);
+  return {variant: sanitizer ?? 'dev', warning};
+}
+
+export function selectGradleTesterForRun(
+  enableOptimized: boolean,
+): ReturnType<typeof selectGradleTester> {
+  return selectGradleTester({enableASAN, enableOptimized, enableTSAN});
+}
+
+export function getGradleTesterPath(variant: GradleTesterVariant): string {
+  return path.join(
+    GRADLE_BUILD_OUTPUT_PATH,
+    GRADLE_TESTER_BUILDS[variant].directory,
+    'fantom_tester',
+  );
+}
+
 export function getFantomTesterPath({
   hermesVariant,
   ...options
 }: TesterOptions): string {
+  if (isOSS) {
+    return getGradleTesterPath(
+      selectGradleTesterForRun(options.enableOptimized).variant,
+    );
+  }
   return path.join(
     NATIVE_BUILD_OUTPUT_PATH,
     `fantom-tester-${(hermesVariant as string).toLowerCase()}-${options.enableOptimized ? 'opt' : 'dev'}${options.enableCoverage ? '-coverage' : ''}`,
   );
 }
 
+// Built once per run or REPL session, before it starts: Jest's workers cannot share a Gradle build.
+function buildWithGradle(variant: GradleTesterVariant): void {
+  if (fs.existsSync(getGradleTesterPath(variant))) {
+    return;
+  }
+
+  const gradle = path.join(PROJECT_ROOT, 'gradlew');
+  const task = `:private:react-native-fantom:${GRADLE_TESTER_BUILDS[variant].task}`;
+  maybeLogCommand(gradle, [task]);
+  const result = spawnSync(gradle, [task], {
+    cwd: PROJECT_ROOT,
+    stdio: 'inherit',
+  });
+  if (result.status !== 0) {
+    const outcome =
+      result.error?.message ?? `exit ${String(result.status ?? result.signal)}`;
+    throw new Error(
+      `Building the Fantom tester with \`./gradlew ${task}\` failed (${outcome}). CMake and the compiler write their output to ${path.join(GRADLE_BUILD_OUTPUT_PATH, 'reports')}.`,
+      {cause: result.error},
+    );
+  }
+}
+
 export function build(options: TesterOptions, env: EnvironmentOverrides): void {
+  if (isOSS) {
+    const {variant, warning} = selectGradleTesterForRun(
+      options.enableOptimized,
+    );
+    if (warning != null) {
+      printConsoleLog({type: 'console-log', level: 'warn', message: warning});
+    }
+    buildWithGradle(variant);
+    return;
+  }
+
   const destPath = getFantomTesterPath(options);
   if (fs.existsSync(destPath)) {
     return;
@@ -125,7 +223,7 @@ export function run(
   options: TesterOptions,
   env: EnvironmentOverrides,
 ): AsyncCommandResult {
-  if (!isCI && !debugCpp) {
+  if (!isCI && !isOSS && !debugCpp) {
     build(options, env);
   }
 

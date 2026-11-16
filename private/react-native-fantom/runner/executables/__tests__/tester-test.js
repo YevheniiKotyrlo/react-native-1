@@ -1,0 +1,312 @@
+/**
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @flow strict-local
+ * @format
+ */
+
+import typeof * as Tester from '../tester';
+
+import {
+  replaceFantomEnvironment,
+  restoreEnvironment,
+} from '../../__tests__/fantomEnvironment';
+import {HermesVariant} from '../../utils';
+import {
+  GRADLE_TESTER_BUILDS,
+  getGradleTesterPath,
+  selectGradleTester,
+} from '../tester';
+import fs from 'node:fs';
+import path from 'node:path';
+
+jest.mock('node:child_process', () => ({
+  ...jest.requireActual('node:child_process'),
+  spawnSync: jest.fn(),
+}));
+
+jest.mock('node:fs', () => ({
+  ...jest.requireActual('node:fs'),
+  existsSync: jest.fn(),
+}));
+
+jest.mock('../../utils', () => ({
+  ...jest.requireActual('../../utils'),
+  // Jest's transform drops Flow enums: https://github.com/react/react-native/issues/60027
+  HermesVariant: {Hermes: 'Hermes'},
+  runCommand: jest.fn(),
+}));
+
+const FANTOM_DIRECTORY = path.resolve(__dirname, '..', '..', '..');
+
+const GRADLE_BUILD_DIRECTORY = path.join(FANTOM_DIRECTORY, 'build');
+
+const GRADLEW = path.resolve(FANTOM_DIRECTORY, '..', '..', 'gradlew');
+
+const DEV_TESTER_OPTIONS = {
+  enableCoverage: false,
+  enableOptimized: false,
+  hermesVariant: HermesVariant.Hermes,
+};
+
+const BOTH_SANITIZERS_WARNING =
+  'ASAN and TSAN modes cannot be used together. Using ASAN mode as a fallback.';
+
+afterEach(() => {
+  restoreEnvironment();
+  jest.restoreAllMocks();
+});
+
+type RegisteredGradleTesterVariant = Readonly<{
+  directory: string,
+  task: string,
+  sanitizer: ?string,
+}>;
+
+function registeredGradleTesterVariants(): Readonly<{
+  [variant: string]: RegisteredGradleTesterVariant,
+}> {
+  const buildScript = fs.readFileSync(
+    path.join(FANTOM_DIRECTORY, 'build.gradle.kts'),
+    'utf8',
+  );
+  return Object.fromEntries(
+    Array.from(
+      buildScript.matchAll(
+        /FantomTesterVariant\(\s*"(\w*)",\s*File\("\$buildDir\/([\w-]+)"\),\s*(?:null|"(\w+)")\s*\)/g,
+      ),
+      ([, taskSuffix, directory, sanitizer]) => [
+        taskSuffix === '' ? 'dev' : taskSuffix.toLowerCase(),
+        {
+          directory,
+          task: `buildFantomTester${taskSuffix}`,
+          sanitizer: sanitizer ?? null,
+        },
+      ],
+    ),
+  );
+}
+
+// The runner's modules read the environment when they load, so each case loads them after setting it.
+function loadOSSTester(
+  fantomVariables: Readonly<{[variable: string]: string}>,
+): Readonly<{
+  tester: Tester,
+  spawnSync: JestMockFn<
+    ReadonlyArray<unknown>,
+    Readonly<{status: ?number, signal?: ?string, error?: ?Error}>,
+  >,
+  existsSync: JestMockFn<[string], boolean>,
+  runCommand: JestMockFn<ReadonlyArray<unknown>, void>,
+  warn: JestMockFn<ReadonlyArray<unknown>, void>,
+}> {
+  replaceFantomEnvironment({...fantomVariables, FANTOM_FORCE_OSS_BUILD: '1'});
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  return {
+    tester: require('../tester'),
+    spawnSync: jest.requireMock('node:child_process').spawnSync,
+    existsSync: jest.requireMock('node:fs').existsSync,
+    runCommand: jest.requireMock('../../utils').runCommand,
+    warn: jest.spyOn(console, 'warn').mockImplementation(() => {}),
+  };
+}
+
+describe('getGradleTesterPath', () => {
+  it('runs the tester Gradle builds with no sanitizer', () => {
+    expect(getGradleTesterPath('dev')).toBe(
+      path.join(GRADLE_BUILD_DIRECTORY, 'tester', 'fantom_tester'),
+    );
+  });
+
+  it('runs the AddressSanitizer tester from its own directory', () => {
+    expect(getGradleTesterPath('asan')).toBe(
+      path.join(GRADLE_BUILD_DIRECTORY, 'tester-asan', 'fantom_tester'),
+    );
+  });
+
+  it('runs the ThreadSanitizer tester from its own directory', () => {
+    expect(getGradleTesterPath('tsan')).toBe(
+      path.join(GRADLE_BUILD_DIRECTORY, 'tester-tsan', 'fantom_tester'),
+    );
+  });
+});
+
+describe('GRADLE_TESTER_BUILDS', () => {
+  it('names each tester variant build.gradle.kts registers, by its task and directory', () => {
+    expect(GRADLE_TESTER_BUILDS).toEqual(
+      Object.fromEntries(
+        Object.entries(registeredGradleTesterVariants()).map(
+          ([variant, {directory, task}]) => [variant, {directory, task}],
+        ),
+      ),
+    );
+  });
+
+  it('builds each sanitizer variant with the sanitizer it is named for', () => {
+    expect(
+      Object.fromEntries(
+        Object.entries(registeredGradleTesterVariants()).map(
+          ([variant, {sanitizer}]) => [variant, sanitizer],
+        ),
+      ),
+    ).toEqual({dev: null, asan: 'address', tsan: 'thread'});
+  });
+});
+
+describe('selectGradleTester', () => {
+  it('runs a dev config on the tester of the sanitizer it enables', () => {
+    expect(
+      selectGradleTester({
+        enableASAN: false,
+        enableOptimized: false,
+        enableTSAN: true,
+      }),
+    ).toEqual({variant: 'tsan', warning: null});
+  });
+
+  it('runs a dev config on the dev tester when no sanitizer is enabled', () => {
+    expect(
+      selectGradleTester({
+        enableASAN: false,
+        enableOptimized: false,
+        enableTSAN: false,
+      }),
+    ).toEqual({variant: 'dev', warning: null});
+  });
+});
+
+describe('selectGradleTesterForRun', () => {
+  it('runs a dev config on the tester FANTOM_ENABLE_ASAN builds', () => {
+    replaceFantomEnvironment({FANTOM_ENABLE_ASAN: '1'});
+    expect(require('../tester').selectGradleTesterForRun(false)).toEqual({
+      variant: 'asan',
+      warning: null,
+    });
+  });
+
+  it('runs a dev config on the tester FANTOM_ENABLE_TSAN builds', () => {
+    replaceFantomEnvironment({FANTOM_ENABLE_TSAN: '1'});
+    expect(require('../tester').selectGradleTesterForRun(false)).toEqual({
+      variant: 'tsan',
+      warning: null,
+    });
+  });
+
+  it('runs a dev config on the dev tester with no sanitizer enabled', () => {
+    replaceFantomEnvironment({});
+    expect(require('../tester').selectGradleTesterForRun(false)).toEqual({
+      variant: 'dev',
+      warning: null,
+    });
+  });
+});
+
+describe('an OSS run', () => {
+  it('runs a dev config on the tester of the sanitizer it enables', () => {
+    const {tester} = loadOSSTester({FANTOM_ENABLE_TSAN: '1'});
+    expect(tester.getFantomTesterPath(DEV_TESTER_OPTIONS)).toBe(
+      path.join(GRADLE_BUILD_DIRECTORY, 'tester-tsan', 'fantom_tester'),
+    );
+  });
+
+  it('builds a missing tester with the Gradle task of its variant', () => {
+    const {tester, spawnSync, existsSync} = loadOSSTester({
+      FANTOM_ENABLE_TSAN: '1',
+    });
+    existsSync.mockReturnValue(false);
+    spawnSync.mockReturnValue({status: 0});
+
+    tester.build(DEV_TESTER_OPTIONS, {});
+
+    expect(spawnSync.mock.calls).toEqual([
+      [
+        GRADLEW,
+        [':private:react-native-fantom:buildFantomTesterTsan'],
+        expect.objectContaining({cwd: path.dirname(GRADLEW)}),
+      ],
+    ]);
+  });
+
+  it("builds the tester it selects in Jest's global setup", async () => {
+    const {spawnSync, existsSync} = loadOSSTester({FANTOM_ENABLE_TSAN: '1'});
+    existsSync.mockReturnValue(false);
+    spawnSync.mockReturnValue({status: 0});
+
+    await require('../../global-setup/build').default(false, {});
+
+    expect(spawnSync.mock.calls.map(([, args]) => args)).toEqual([
+      [':private:react-native-fantom:buildFantomTesterTsan'],
+    ]);
+  });
+
+  it('leaves a built tester as it is', () => {
+    const {tester, spawnSync, existsSync} = loadOSSTester({
+      FANTOM_ENABLE_TSAN: '1',
+    });
+    existsSync.mockReturnValue(true);
+
+    tester.build(DEV_TESTER_OPTIONS, {});
+
+    expect(spawnSync).not.toHaveBeenCalled();
+  });
+
+  it("names the task, its exit and Gradle's reports when the build fails", () => {
+    const {tester, spawnSync, existsSync} = loadOSSTester({
+      FANTOM_ENABLE_ASAN: '1',
+    });
+    existsSync.mockReturnValue(false);
+    spawnSync.mockReturnValue({status: 1, signal: null, error: null});
+
+    expect(() => tester.build(DEV_TESTER_OPTIONS, {})).toThrow(
+      `Building the Fantom tester with \`./gradlew :private:react-native-fantom:buildFantomTesterAsan\` failed (exit 1). CMake and the compiler write their output to ${path.join(GRADLE_BUILD_DIRECTORY, 'reports')}.`,
+    );
+  });
+
+  it('warns once, where it builds, when both sanitizers are enabled', () => {
+    const {tester, spawnSync, existsSync, runCommand, warn} = loadOSSTester({
+      FANTOM_ENABLE_ASAN: '1',
+      FANTOM_ENABLE_TSAN: '1',
+    });
+    existsSync.mockReturnValue(false);
+    spawnSync.mockReturnValue({status: 0});
+
+    tester.build(DEV_TESTER_OPTIONS, {});
+    tester.run(['--first'], DEV_TESTER_OPTIONS, {});
+    tester.run(['--second'], DEV_TESTER_OPTIONS, {});
+
+    expect(warn.mock.calls).toEqual([[BOTH_SANITIZERS_WARNING]]);
+    expect(spawnSync.mock.calls[0][1]).toEqual([
+      ':private:react-native-fantom:buildFantomTesterAsan',
+    ]);
+    expect(runCommand.mock.calls.map(([command]) => command)).toEqual([
+      path.join(GRADLE_BUILD_DIRECTORY, 'tester-asan', 'fantom_tester'),
+      path.join(GRADLE_BUILD_DIRECTORY, 'tester-asan', 'fantom_tester'),
+    ]);
+  });
+
+  it('records the tester of its variant with perf under FANTOM_PROFILE_CPP', () => {
+    const {tester, existsSync, runCommand} = loadOSSTester({
+      FANTOM_ENABLE_TSAN: '1',
+      FANTOM_PROFILE_CPP: '1',
+    });
+    existsSync.mockReturnValue(true);
+
+    tester.run(['--bundle'], DEV_TESTER_OPTIONS, {});
+
+    expect(runCommand.mock.calls).toEqual([
+      [
+        'perf',
+        expect.arrayContaining([
+          'record',
+          '--',
+          path.join(GRADLE_BUILD_DIRECTORY, 'tester-tsan', 'fantom_tester'),
+          '--bundle',
+        ]),
+        {},
+      ],
+    ]);
+  });
+});

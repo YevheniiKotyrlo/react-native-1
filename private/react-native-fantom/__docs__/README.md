@@ -449,7 +449,8 @@ FANTOM_DEBUG_CPP=1 yarn fantom <regexForTestFiles>
 ```
 
 This would start a debugging session in VS Code with an initial breakpoint in
-the Fantom CLI binary.
+the Fantom CLI binary. It runs the tester through Buck, inside Meta's
+infrastructure; outside it, Fantom stops with an error.
 
 #### Address and thread sanitizer for C++
 
@@ -468,6 +469,21 @@ For thread sanitizer, correspondingly, use flag `FANTOM_ENABLE_TSAN`:
 ```shell
 FANTOM_ENABLE_TSAN=1 yarn fantom <regexForTestFiles>
 ```
+
+Outside Meta's infrastructure, Gradle builds the tester with that sanitizer into
+a directory of its own, `private/react-native-fantom/build/tester-asan` or
+`build/tester-tsan`, before the first test of the first run that sets the
+variable. Rebuild it after changing C++ with
+`./gradlew :private:react-native-fantom:buildFantomTesterAsan` or
+`buildFantomTesterTsan`. Hermes, which the tester links from React Native's
+Hermes build, is not built with the sanitizer, and its copy of jsi stops an
+AddressSanitizer run at start-up until
+[#59669](https://github.com/react/react-native/issues/59669) is fixed. Sanitizer
+runtimes older than the fix for
+[google/sanitizers#1716](https://github.com/google/sanitizers/issues/1716),
+clang 14's among them, stop at start-up on a kernel with 32 bits of mmap
+randomization; `setarch "$(uname -m)" -R yarn fantom <regexForTestFiles>` runs a
+test with it off.
 
 ### Profiling
 

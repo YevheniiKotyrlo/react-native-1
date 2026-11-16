@@ -24,6 +24,13 @@ if(NOT FANTOM_NINJA)
   find_program(FANTOM_NINJA ninja REQUIRED)
 endif()
 
+set(SKIA_EXTRA_CFLAGS
+  "\"-DSK_GAMMA_EXPONENT=1.0\",\"-DSK_GAMMA_CONTRAST=0.0\",\"-DSK_DISABLE_LEGACY_SHADERCONTEXT\",\"-DSK_DISABLE_LOWP_RASTER_PIPELINE\",\"-DSK_FORCE_RASTER_PIPELINE_BLITTER\",\"-DSK_RASTER_PIPELINE_FORCE_SCALAR\",\"-ffp-contract=off\""
+)
+if(FANTOM_SANITIZER)
+  string(APPEND SKIA_EXTRA_CFLAGS ",\"-fsanitize=${FANTOM_SANITIZER}\",\"-fno-omit-frame-pointer\"")
+endif()
+
 set(SKIA_GN_ARGS
   "is_official_build=true is_debug=false is_component_build=false"
   "skia_enable_gpu=false skia_enable_graphite=false skia_enable_pdf=false"
@@ -33,7 +40,7 @@ set(SKIA_GN_ARGS
   "skia_enable_fontmgr_custom_empty=true skia_enable_fontmgr_win=false"
   "skia_enable_fontmgr_win_gdi=false skia_use_harfbuzz=false skia_use_icu=false"
   "skia_use_fixed_gamma_text=false"
-  "extra_cflags=[\"-DSK_GAMMA_EXPONENT=1.0\",\"-DSK_GAMMA_CONTRAST=0.0\",\"-DSK_DISABLE_LEGACY_SHADERCONTEXT\",\"-DSK_DISABLE_LOWP_RASTER_PIPELINE\",\"-DSK_FORCE_RASTER_PIPELINE_BLITTER\",\"-DSK_RASTER_PIPELINE_FORCE_SCALAR\",\"-ffp-contract=off\"]"
+  "extra_cflags=[${SKIA_EXTRA_CFLAGS}]"
   "skia_use_expat=false skia_use_piex=false skia_use_dng_sdk=false"
   "skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false"
   "skia_use_libwebp_decode=false skia_use_libwebp_encode=false skia_use_libgifcodec=false"

@@ -11,7 +11,7 @@
 import type {EnvironmentOverrides} from '../utils';
 
 import {createBundle} from '../bundling';
-import {isCI} from '../EnvironmentOptions';
+import {isCI, isOSS} from '../EnvironmentOptions';
 import {build as buildHermesCompiler} from '../executables/hermesc';
 import {build as buildFantomTester} from '../executables/tester';
 import {NATIVE_BUILD_OUTPUT_PATH} from '../paths';
@@ -43,6 +43,18 @@ export default async function build(
   enableCoverage: boolean,
   env: EnvironmentOverrides,
 ): Promise<void> {
+  if (isOSS) {
+    buildFantomTester(
+      {
+        enableCoverage: false,
+        enableOptimized: false,
+        hermesVariant: HermesVariant.Hermes,
+      },
+      env,
+    );
+    return;
+  }
+
   try {
     fs.rmSync(NATIVE_BUILD_OUTPUT_PATH, {recursive: true});
   } catch {}
