@@ -7,7 +7,7 @@ on:
 jobs:
   repro:
     name: ${{ matrix.name }}
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 75
     strategy:
       fail-fast: false
