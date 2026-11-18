@@ -1,0 +1,49 @@
+name: ios-metro-port-repro
+
+on:
+  push:
+    branches: [repro/ios-prebuilt-metro-port]
+
+jobs:
+  repro:
+    name: ${{ matrix.name }}
+    runs-on: macos-26
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 0.88.1 prebuilt core (template default)
+            rn: 0.88.1
+            prebuilt: ""
+          - name: 0.88.1 core from source
+            rn: 0.88.1
+            prebuilt: "0"
+          - name: 0.89.0-rc.2 prebuilt core (template default)
+            rn: 0.89.0-rc.2
+            prebuilt: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: repro.sh
+        env:
+          RN_VERSION: ${{ matrix.rn }}
+          OUT: ${{ runner.temp }}/out
+        run: |
+          if [ -n "${{ matrix.prebuilt }}" ]; then export RCT_USE_PREBUILT_RNCORE="${{ matrix.prebuilt }}"; fi
+          set +e
+          bash ./repro.sh 2>&1 | tee "$OUT.log"
+          code=${PIPESTATUS[0]}
+          echo "exit code: $code" | tee -a "$OUT.log"
+          echo "$code" > "$RUNNER_TEMP/exit-code"
+          exit 0
+      - name: collect
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/artifact"
+          cp "$RUNNER_TEMP/out.log" "$RUNNER_TEMP/exit-code" "$RUNNER_TEMP/artifact/" 2>/dev/null || true
+          cp "$RUNNER_TEMP"/out/*.log "$RUNNER_TEMP"/out/*.png "$RUNNER_TEMP/artifact/" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.rn }}-${{ matrix.prebuilt == '0' && 'source' || 'prebuilt' }}
+          path: ${{ runner.temp }}/artifact
